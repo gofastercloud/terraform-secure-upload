@@ -1,5 +1,9 @@
 # terraform-secure-upload
 
+[![CI](https://github.com/gofastercloud/terraform-secure-upload/actions/workflows/ci.yml/badge.svg)](https://github.com/gofastercloud/terraform-secure-upload/actions/workflows/ci.yml)
+[![Terraform](https://img.shields.io/badge/terraform-%3E%3D1.9-blue?logo=terraform)](https://www.terraform.io/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 A Terraform module that creates a secure file upload pipeline on AWS with automatic malware scanning using Amazon GuardDuty Malware Protection for S3.
 
 ## Architecture
