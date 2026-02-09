@@ -89,14 +89,14 @@ resource "aws_kms_alias" "this" {
 module "s3_buckets" {
   source = "./modules/s3-buckets"
 
-  name_prefix              = var.name_prefix
-  tags                     = local.default_tags
-  kms_key_arn              = local.kms_key_arn
-  create_log_bucket        = var.create_log_bucket
-  external_log_bucket_id   = var.log_bucket_name
-  ingress_lifecycle_days   = var.ingress_lifecycle_days
-  egress_lifecycle_days     = var.egress_lifecycle_days
-  quarantine_lifecycle_days = var.quarantine_lifecycle_days
+  name_prefix                = var.name_prefix
+  tags                       = local.default_tags
+  kms_key_arn                = local.kms_key_arn
+  create_log_bucket          = var.create_log_bucket
+  external_log_bucket_id     = var.log_bucket_name
+  ingress_lifecycle_days     = var.ingress_lifecycle_days
+  egress_lifecycle_days      = var.egress_lifecycle_days
+  quarantine_lifecycle_days  = var.quarantine_lifecycle_days
   log_retention_days         = var.s3_log_retention_days
   enable_object_lock         = var.enable_object_lock
   object_lock_retention_days = var.object_lock_retention_days
@@ -124,21 +124,21 @@ module "guardduty_protection" {
 module "file_router" {
   source = "./modules/file-router"
 
-  name_prefix             = var.name_prefix
-  tags                    = local.default_tags
-  kms_key_arn             = local.kms_key_arn
-  ingress_bucket_name     = module.s3_buckets.ingress_bucket_id
-  ingress_bucket_arn      = module.s3_buckets.ingress_bucket_arn
-  egress_bucket_name       = module.s3_buckets.egress_bucket_id
-  egress_bucket_arn        = module.s3_buckets.egress_bucket_arn
-  quarantine_bucket_name  = module.s3_buckets.quarantine_bucket_id
-  quarantine_bucket_arn   = module.s3_buckets.quarantine_bucket_arn
-  lambda_runtime          = var.lambda_runtime
-  lambda_memory_size      = var.lambda_memory_size
-  lambda_timeout          = var.lambda_timeout
+  name_prefix                 = var.name_prefix
+  tags                        = local.default_tags
+  kms_key_arn                 = local.kms_key_arn
+  ingress_bucket_name         = module.s3_buckets.ingress_bucket_id
+  ingress_bucket_arn          = module.s3_buckets.ingress_bucket_arn
+  egress_bucket_name          = module.s3_buckets.egress_bucket_id
+  egress_bucket_arn           = module.s3_buckets.egress_bucket_arn
+  quarantine_bucket_name      = module.s3_buckets.quarantine_bucket_id
+  quarantine_bucket_arn       = module.s3_buckets.quarantine_bucket_arn
+  lambda_runtime              = var.lambda_runtime
+  lambda_memory_size          = var.lambda_memory_size
+  lambda_timeout              = var.lambda_timeout
   lambda_reserved_concurrency = var.lambda_reserved_concurrency
-  sns_subscription_emails = var.sns_subscription_emails
-  log_retention_days      = var.log_retention_days
+  sns_subscription_emails     = var.sns_subscription_emails
+  log_retention_days          = var.log_retention_days
 }
 
 ################################################################################
@@ -153,14 +153,14 @@ module "sftp" {
   tags               = merge(local.default_tags, { Direction = "ingress" })
   kms_key_arn        = local.kms_key_arn
   create_sftp_server = var.create_sftp_server
-  existing_server_id  = var.sftp_server_id
-  endpoint_type       = var.sftp_endpoint_type
-  vpc_id              = var.sftp_vpc_id
-  subnet_ids          = var.sftp_subnet_ids
-  allowed_cidrs       = var.sftp_allowed_cidrs
-  bucket_name = module.s3_buckets.ingress_bucket_id
-  bucket_arn  = module.s3_buckets.ingress_bucket_arn
-  sftp_users  = var.sftp_users
+  existing_server_id = var.sftp_server_id
+  endpoint_type      = var.sftp_endpoint_type
+  vpc_id             = var.sftp_vpc_id
+  subnet_ids         = var.sftp_subnet_ids
+  allowed_cidrs      = var.sftp_allowed_cidrs
+  bucket_name        = module.s3_buckets.ingress_bucket_id
+  bucket_arn         = module.s3_buckets.ingress_bucket_arn
+  sftp_users         = var.sftp_users
 }
 
 ################################################################################

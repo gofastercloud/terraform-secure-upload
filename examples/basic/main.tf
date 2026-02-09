@@ -5,7 +5,7 @@ provider "aws" {
 module "secure_upload" {
   source = "../../"
 
-  name_prefix = var.name_prefix
+  name_prefix         = var.name_prefix
   enable_sftp_ingress = false
 
   tags = {

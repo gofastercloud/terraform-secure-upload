@@ -24,12 +24,12 @@ variable "test_id" {
 module "secure_upload" {
   source = "../../../"
 
-  name_prefix        = "terratest-full-${var.test_id}"
-  enable_sftp_ingress        = true
-  create_sftp_server = true
-  sftp_endpoint_type = "PUBLIC"
+  name_prefix         = "terratest-full-${var.test_id}"
+  enable_sftp_ingress = true
+  create_sftp_server  = true
+  sftp_endpoint_type  = "PUBLIC"
 
-  ingress_lifecycle_days   = 2
+  ingress_lifecycle_days    = 2
   egress_lifecycle_days     = 60
   quarantine_lifecycle_days = 180
 

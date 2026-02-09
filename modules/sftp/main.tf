@@ -99,7 +99,10 @@ data "aws_iam_policy_document" "transfer_logging_assume" {
     condition {
       test     = "ArnLike"
       variable = "aws:SourceArn"
-      values   = [local.server_arn]
+      # Use a wildcard pattern to avoid a dependency cycle: the server
+      # references this role, so the assume policy cannot reference the
+      # server ARN back. The account/region condition still limits scope.
+      values = ["arn:aws:transfer:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:server/*"]
     }
   }
 }
@@ -192,7 +195,7 @@ data "aws_iam_policy_document" "sftp_user" {
     actions = var.read_only ? [
       "s3:GetObject",
       "s3:GetObjectVersion",
-    ] : [
+      ] : [
       "s3:PutObject",
       "s3:GetObject",
       "s3:GetObjectVersion",
@@ -207,7 +210,7 @@ data "aws_iam_policy_document" "sftp_user" {
     effect = "Allow"
     actions = var.read_only ? [
       "kms:Decrypt",
-    ] : [
+      ] : [
       "kms:Decrypt",
       "kms:GenerateDataKey",
     ]

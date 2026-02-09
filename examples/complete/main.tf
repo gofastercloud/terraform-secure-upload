@@ -13,7 +13,7 @@ module "secure_upload" {
 
   # S3 lifecycle
   ingress_lifecycle_days    = var.ingress_lifecycle_days
-  egress_lifecycle_days      = var.egress_lifecycle_days
+  egress_lifecycle_days     = var.egress_lifecycle_days
   quarantine_lifecycle_days = var.quarantine_lifecycle_days
   enable_object_lock        = var.enable_object_lock
 
@@ -29,8 +29,8 @@ module "secure_upload" {
   log_retention_days = var.log_retention_days
 
   # SFTP with VPC endpoint
-  enable_sftp_ingress        = true
-  create_sftp_server = true
+  enable_sftp_ingress = true
+  create_sftp_server  = true
   sftp_endpoint_type  = "VPC"
   sftp_vpc_id         = var.vpc_id
   sftp_subnet_ids     = var.subnet_ids

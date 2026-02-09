@@ -24,7 +24,7 @@ variable "test_id" {
 module "secure_upload" {
   source = "../../../"
 
-  name_prefix = "terratest-basic-${var.test_id}"
+  name_prefix         = "terratest-basic-${var.test_id}"
   enable_sftp_ingress = false
 
   tags = {

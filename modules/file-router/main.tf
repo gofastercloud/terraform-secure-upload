@@ -27,10 +27,10 @@ resource "aws_cloudwatch_log_group" "file_router" {
 ################################################################################
 
 resource "aws_sqs_queue" "dlq" {
-  name                       = "${var.name_prefix}-file-router-dlq"
-  kms_master_key_id          = var.kms_key_arn
+  name                              = "${var.name_prefix}-file-router-dlq"
+  kms_master_key_id                 = var.kms_key_arn
   kms_data_key_reuse_period_seconds = var.sqs_kms_data_key_reuse_seconds
-  tags                       = var.tags
+  tags                              = var.tags
 }
 
 resource "aws_cloudwatch_metric_alarm" "dlq_messages" {
