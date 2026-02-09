@@ -2,6 +2,8 @@
 # IAM Role for GuardDuty Malware Protection
 ################################################################################
 
+data "aws_caller_identity" "current" {}
+
 data "aws_iam_policy_document" "guardduty_assume_role" {
   statement {
     effect  = "Allow"
@@ -10,6 +12,12 @@ data "aws_iam_policy_document" "guardduty_assume_role" {
     principals {
       type        = "Service"
       identifiers = ["malware-protection-plan.guardduty.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
     }
   }
 }
@@ -32,7 +40,7 @@ data "aws_iam_policy_document" "guardduty_malware" {
       "s3:PutObjectTagging",
     ]
 
-    resources = ["${var.staging_bucket_arn}/*"]
+    resources = ["${var.ingress_bucket_arn}/*"]
   }
 
   statement {
@@ -44,7 +52,7 @@ data "aws_iam_policy_document" "guardduty_malware" {
       "s3:GetBucketLocation",
     ]
 
-    resources = [var.staging_bucket_arn]
+    resources = [var.ingress_bucket_arn]
   }
 
   statement {
@@ -75,7 +83,7 @@ resource "aws_guardduty_malware_protection_plan" "this" {
 
   protected_resource {
     s3_bucket {
-      bucket_name = var.staging_bucket_name
+      bucket_name = var.ingress_bucket_name
     }
   }
 

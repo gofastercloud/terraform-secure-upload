@@ -7,12 +7,13 @@ module "secure_upload" {
 
   name_prefix = var.name_prefix
 
-  # KMS — bring your own key
-  kms_key_arn = var.kms_key_arn
+  # KMS — bring your own key or let the module create one
+  create_kms_key = var.kms_key_arn != null ? false : true
+  kms_key_arn    = var.kms_key_arn
 
   # S3 lifecycle
-  staging_lifecycle_days    = var.staging_lifecycle_days
-  clean_lifecycle_days      = var.clean_lifecycle_days
+  ingress_lifecycle_days    = var.ingress_lifecycle_days
+  egress_lifecycle_days      = var.egress_lifecycle_days
   quarantine_lifecycle_days = var.quarantine_lifecycle_days
   enable_object_lock        = var.enable_object_lock
 
@@ -28,12 +29,19 @@ module "secure_upload" {
   log_retention_days = var.log_retention_days
 
   # SFTP with VPC endpoint
-  enable_sftp        = true
+  enable_sftp_ingress        = true
   create_sftp_server = true
-  sftp_endpoint_type = "VPC"
-  sftp_vpc_id        = var.vpc_id
-  sftp_subnet_ids    = var.subnet_ids
-  sftp_users         = var.sftp_users
+  sftp_endpoint_type  = "VPC"
+  sftp_vpc_id         = var.vpc_id
+  sftp_subnet_ids     = var.subnet_ids
+  sftp_allowed_cidrs  = var.sftp_allowed_cidrs
+  sftp_users          = var.sftp_users
+
+  # SFTP Egress — read-only access to egress bucket
+  enable_sftp_egress        = var.enable_sftp_egress
+  create_sftp_egress_server = var.create_sftp_egress_server
+  sftp_egress_endpoint_type = "PUBLIC"
+  sftp_egress_users         = var.sftp_egress_users
 
   tags = var.tags
 }

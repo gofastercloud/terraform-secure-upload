@@ -4,7 +4,7 @@
 
 This Terraform module provides a secure file upload pipeline with automated malware scanning.
 Files uploaded via S3 API or SFTP are scanned by GuardDuty Malware Protection, then routed
-to clean or quarantine buckets based on scan results.
+to egress or quarantine buckets based on scan results.
 
 ## Flow
 
@@ -16,7 +16,7 @@ to clean or quarantine buckets based on scan results.
                            │
                            ▼
 ┌─────────────┐    ┌──────────────┐    ┌────────────────────┐
-│  SFTP User  │───▶│   Staging    │───▶│  GuardDuty Malware │
+│  SFTP User  │───▶│   Ingress    │───▶│  GuardDuty Malware │
 │  (Transfer  │    │   Bucket     │    │  Protection for S3 │
 │   Family)   │    └──────────────┘    └─────────┬──────────┘
 └─────────────┘                                  │
@@ -26,10 +26,10 @@ to clean or quarantine buckets based on scan results.
                                         │  Router Lambda │
                                         └───┬────────┬───┘
                                             │        │
-                                   Clean    │        │  Malware
+                                   Egress   │        │  Malware
                                             ▼        ▼
                                   ┌──────────┐  ┌──────────────┐
-                                  │  Clean   │  │  Quarantine  │
+                                  │  Egress  │  │  Quarantine  │
                                   │  Bucket  │  │    Bucket    │
                                   └──────────┘  └──────┬───────┘
                                                        │
@@ -50,7 +50,7 @@ terraform-secure-upload/
 ├── versions.tf          # Provider and Terraform version constraints
 ├── locals.tf            # Common locals (naming, tags)
 ├── modules/
-│   ├── s3-buckets/      # S3 infrastructure (staging, clean, quarantine, logs)
+│   ├── s3-buckets/      # S3 infrastructure (ingress, egress, quarantine, logs)
 │   ├── guardduty-protection/  # GuardDuty Malware Protection plan + IAM
 │   ├── file-router/     # Lambda + EventBridge + SNS + SQS DLQ
 │   └── sftp/            # Transfer Family server + users
@@ -74,7 +74,7 @@ terraform-secure-upload/
 
 3. **Lambda router**: Simple Python Lambda triggered by EventBridge when GuardDuty
    completes scanning. Reads the scan result tag, copies to appropriate bucket, deletes
-   from staging.
+   from ingress.
 
 4. **SFTP flexibility**: `create_sftp_server` variable controls whether to create a new
    Transfer Family server or use an existing one via `sftp_server_id`.

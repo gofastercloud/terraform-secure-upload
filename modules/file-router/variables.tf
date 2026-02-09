@@ -9,23 +9,23 @@ variable "tags" {
   default     = {}
 }
 
-variable "staging_bucket_name" {
-  description = "Name of the staging S3 bucket"
+variable "ingress_bucket_name" {
+  description = "Name of the ingress S3 bucket"
   type        = string
 }
 
-variable "staging_bucket_arn" {
-  description = "ARN of the staging S3 bucket"
+variable "ingress_bucket_arn" {
+  description = "ARN of the ingress S3 bucket"
   type        = string
 }
 
-variable "clean_bucket_name" {
-  description = "Name of the clean S3 bucket"
+variable "egress_bucket_name" {
+  description = "Name of the egress S3 bucket"
   type        = string
 }
 
-variable "clean_bucket_arn" {
-  description = "ARN of the clean S3 bucket"
+variable "egress_bucket_arn" {
+  description = "ARN of the egress S3 bucket"
   type        = string
 }
 
@@ -44,6 +44,12 @@ variable "kms_key_arn" {
   type        = string
 }
 
+variable "lambda_runtime" {
+  description = "Lambda runtime identifier"
+  type        = string
+  default     = "python3.12"
+}
+
 variable "lambda_memory_size" {
   description = "Memory size for the Lambda function in MB"
   type        = number
@@ -60,6 +66,12 @@ variable "lambda_reserved_concurrency" {
   description = "Reserved concurrent executions for the Lambda function"
   type        = number
   default     = 10
+}
+
+variable "sqs_kms_data_key_reuse_seconds" {
+  description = "Duration (seconds) that SQS reuses a data key before calling KMS again."
+  type        = number
+  default     = 300
 }
 
 variable "sns_subscription_emails" {

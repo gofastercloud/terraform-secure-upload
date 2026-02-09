@@ -15,5 +15,5 @@ terraform apply
 ## Notes
 
 - The existing server must use `SERVICE_MANAGED` identity provider type
-- The module creates new SFTP users and IAM roles scoped to the staging bucket
+- The module creates new SFTP users and IAM roles scoped to the ingress bucket
 - The existing server's endpoint type (PUBLIC or VPC) does not need to be specified — it is already configured on the server

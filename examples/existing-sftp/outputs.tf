@@ -1,11 +1,11 @@
-output "staging_bucket_id" {
-  description = "Name of the staging bucket."
-  value       = module.secure_upload.staging_bucket_id
+output "ingress_bucket_id" {
+  description = "Name of the ingress bucket."
+  value       = module.secure_upload.ingress_bucket_id
 }
 
-output "clean_bucket_id" {
-  description = "Name of the clean bucket."
-  value       = module.secure_upload.clean_bucket_id
+output "egress_bucket_id" {
+  description = "Name of the egress bucket."
+  value       = module.secure_upload.egress_bucket_id
 }
 
 output "quarantine_bucket_id" {

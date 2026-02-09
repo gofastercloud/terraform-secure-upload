@@ -2,13 +2,19 @@
 # Logs Bucket (created first - other buckets log to this one)
 ################################################################################
 
+locals {
+  log_bucket_id = var.create_log_bucket ? aws_s3_bucket.logs[0].id : var.external_log_bucket_id
+}
+
 resource "aws_s3_bucket" "logs" {
+  count  = var.create_log_bucket ? 1 : 0
   bucket = "${var.name_prefix}-logs"
   tags   = var.tags
 }
 
 resource "aws_s3_bucket_versioning" "logs" {
-  bucket = aws_s3_bucket.logs.id
+  count  = var.create_log_bucket ? 1 : 0
+  bucket = aws_s3_bucket.logs[0].id
 
   versioning_configuration {
     status = "Enabled"
@@ -16,7 +22,8 @@ resource "aws_s3_bucket_versioning" "logs" {
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "logs" {
-  bucket = aws_s3_bucket.logs.id
+  count  = var.create_log_bucket ? 1 : 0
+  bucket = aws_s3_bucket.logs[0].id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -28,7 +35,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "logs" {
 }
 
 resource "aws_s3_bucket_public_access_block" "logs" {
-  bucket = aws_s3_bucket.logs.id
+  count  = var.create_log_bucket ? 1 : 0
+  bucket = aws_s3_bucket.logs[0].id
 
   block_public_acls       = true
   block_public_policy     = true
@@ -37,7 +45,8 @@ resource "aws_s3_bucket_public_access_block" "logs" {
 }
 
 resource "aws_s3_bucket_ownership_controls" "logs" {
-  bucket = aws_s3_bucket.logs.id
+  count  = var.create_log_bucket ? 1 : 0
+  bucket = aws_s3_bucket.logs[0].id
 
   rule {
     object_ownership = "BucketOwnerEnforced"
@@ -45,13 +54,15 @@ resource "aws_s3_bucket_ownership_controls" "logs" {
 }
 
 data "aws_iam_policy_document" "logs" {
+  count = var.create_log_bucket ? 1 : 0
+
   statement {
     sid     = "DenyInsecureTransport"
     effect  = "Deny"
     actions = ["s3:*"]
     resources = [
-      aws_s3_bucket.logs.arn,
-      "${aws_s3_bucket.logs.arn}/*",
+      aws_s3_bucket.logs[0].arn,
+      "${aws_s3_bucket.logs[0].arn}/*",
     ]
 
     principals {
@@ -71,7 +82,7 @@ data "aws_iam_policy_document" "logs" {
     effect  = "Allow"
     actions = ["s3:PutObject"]
     resources = [
-      "${aws_s3_bucket.logs.arn}/*",
+      "${aws_s3_bucket.logs[0].arn}/*",
     ]
 
     principals {
@@ -88,16 +99,23 @@ data "aws_iam_policy_document" "logs" {
 }
 
 resource "aws_s3_bucket_policy" "logs" {
-  bucket = aws_s3_bucket.logs.id
-  policy = data.aws_iam_policy_document.logs.json
+  count  = var.create_log_bucket ? 1 : 0
+  bucket = aws_s3_bucket.logs[0].id
+  policy = data.aws_iam_policy_document.logs[0].json
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "logs" {
-  bucket = aws_s3_bucket.logs.id
+  count  = var.create_log_bucket ? 1 : 0
+  bucket = aws_s3_bucket.logs[0].id
 
   rule {
     id     = "expire-logs"
     status = "Enabled"
+
+    transition {
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }
 
     expiration {
       days = var.log_retention_days
@@ -106,24 +124,24 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
 }
 
 ################################################################################
-# Staging Bucket
+# Ingress Bucket
 ################################################################################
 
-resource "aws_s3_bucket" "staging" {
-  bucket = "${var.name_prefix}-staging"
+resource "aws_s3_bucket" "ingress" {
+  bucket = "${var.name_prefix}-ingress"
   tags   = var.tags
 }
 
-resource "aws_s3_bucket_versioning" "staging" {
-  bucket = aws_s3_bucket.staging.id
+resource "aws_s3_bucket_versioning" "ingress" {
+  bucket = aws_s3_bucket.ingress.id
 
   versioning_configuration {
     status = "Enabled"
   }
 }
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "staging" {
-  bucket = aws_s3_bucket.staging.id
+resource "aws_s3_bucket_server_side_encryption_configuration" "ingress" {
+  bucket = aws_s3_bucket.ingress.id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -134,8 +152,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "staging" {
   }
 }
 
-resource "aws_s3_bucket_public_access_block" "staging" {
-  bucket = aws_s3_bucket.staging.id
+resource "aws_s3_bucket_public_access_block" "ingress" {
+  bucket = aws_s3_bucket.ingress.id
 
   block_public_acls       = true
   block_public_policy     = true
@@ -143,28 +161,28 @@ resource "aws_s3_bucket_public_access_block" "staging" {
   restrict_public_buckets = true
 }
 
-resource "aws_s3_bucket_ownership_controls" "staging" {
-  bucket = aws_s3_bucket.staging.id
+resource "aws_s3_bucket_ownership_controls" "ingress" {
+  bucket = aws_s3_bucket.ingress.id
 
   rule {
     object_ownership = "BucketOwnerEnforced"
   }
 }
 
-resource "aws_s3_bucket_logging" "staging" {
-  bucket        = aws_s3_bucket.staging.id
-  target_bucket = aws_s3_bucket.logs.id
-  target_prefix = "staging/"
+resource "aws_s3_bucket_logging" "ingress" {
+  bucket        = aws_s3_bucket.ingress.id
+  target_bucket = local.log_bucket_id
+  target_prefix = "ingress/"
 }
 
-data "aws_iam_policy_document" "ssl_only_staging" {
+data "aws_iam_policy_document" "ssl_only_ingress" {
   statement {
     sid     = "DenyInsecureTransport"
     effect  = "Deny"
     actions = ["s3:*"]
     resources = [
-      aws_s3_bucket.staging.arn,
-      "${aws_s3_bucket.staging.arn}/*",
+      aws_s3_bucket.ingress.arn,
+      "${aws_s3_bucket.ingress.arn}/*",
     ]
 
     principals {
@@ -180,43 +198,43 @@ data "aws_iam_policy_document" "ssl_only_staging" {
   }
 }
 
-resource "aws_s3_bucket_policy" "staging" {
-  bucket = aws_s3_bucket.staging.id
-  policy = data.aws_iam_policy_document.ssl_only_staging.json
+resource "aws_s3_bucket_policy" "ingress" {
+  bucket = aws_s3_bucket.ingress.id
+  policy = data.aws_iam_policy_document.ssl_only_ingress.json
 }
 
-resource "aws_s3_bucket_lifecycle_configuration" "staging" {
-  bucket = aws_s3_bucket.staging.id
+resource "aws_s3_bucket_lifecycle_configuration" "ingress" {
+  bucket = aws_s3_bucket.ingress.id
 
   rule {
-    id     = "expire-staging"
+    id     = "expire-ingress"
     status = "Enabled"
 
     expiration {
-      days = var.staging_lifecycle_days
+      days = var.ingress_lifecycle_days
     }
   }
 }
 
 ################################################################################
-# Clean Bucket
+# Egress Bucket
 ################################################################################
 
-resource "aws_s3_bucket" "clean" {
-  bucket = "${var.name_prefix}-clean"
+resource "aws_s3_bucket" "egress" {
+  bucket = "${var.name_prefix}-egress"
   tags   = var.tags
 }
 
-resource "aws_s3_bucket_versioning" "clean" {
-  bucket = aws_s3_bucket.clean.id
+resource "aws_s3_bucket_versioning" "egress" {
+  bucket = aws_s3_bucket.egress.id
 
   versioning_configuration {
     status = "Enabled"
   }
 }
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "clean" {
-  bucket = aws_s3_bucket.clean.id
+resource "aws_s3_bucket_server_side_encryption_configuration" "egress" {
+  bucket = aws_s3_bucket.egress.id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -227,8 +245,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "clean" {
   }
 }
 
-resource "aws_s3_bucket_public_access_block" "clean" {
-  bucket = aws_s3_bucket.clean.id
+resource "aws_s3_bucket_public_access_block" "egress" {
+  bucket = aws_s3_bucket.egress.id
 
   block_public_acls       = true
   block_public_policy     = true
@@ -236,28 +254,28 @@ resource "aws_s3_bucket_public_access_block" "clean" {
   restrict_public_buckets = true
 }
 
-resource "aws_s3_bucket_ownership_controls" "clean" {
-  bucket = aws_s3_bucket.clean.id
+resource "aws_s3_bucket_ownership_controls" "egress" {
+  bucket = aws_s3_bucket.egress.id
 
   rule {
     object_ownership = "BucketOwnerEnforced"
   }
 }
 
-resource "aws_s3_bucket_logging" "clean" {
-  bucket        = aws_s3_bucket.clean.id
-  target_bucket = aws_s3_bucket.logs.id
-  target_prefix = "clean/"
+resource "aws_s3_bucket_logging" "egress" {
+  bucket        = aws_s3_bucket.egress.id
+  target_bucket = local.log_bucket_id
+  target_prefix = "egress/"
 }
 
-data "aws_iam_policy_document" "ssl_only_clean" {
+data "aws_iam_policy_document" "ssl_only_egress" {
   statement {
     sid     = "DenyInsecureTransport"
     effect  = "Deny"
     actions = ["s3:*"]
     resources = [
-      aws_s3_bucket.clean.arn,
-      "${aws_s3_bucket.clean.arn}/*",
+      aws_s3_bucket.egress.arn,
+      "${aws_s3_bucket.egress.arn}/*",
     ]
 
     principals {
@@ -273,20 +291,20 @@ data "aws_iam_policy_document" "ssl_only_clean" {
   }
 }
 
-resource "aws_s3_bucket_policy" "clean" {
-  bucket = aws_s3_bucket.clean.id
-  policy = data.aws_iam_policy_document.ssl_only_clean.json
+resource "aws_s3_bucket_policy" "egress" {
+  bucket = aws_s3_bucket.egress.id
+  policy = data.aws_iam_policy_document.ssl_only_egress.json
 }
 
-resource "aws_s3_bucket_lifecycle_configuration" "clean" {
-  bucket = aws_s3_bucket.clean.id
+resource "aws_s3_bucket_lifecycle_configuration" "egress" {
+  bucket = aws_s3_bucket.egress.id
 
   rule {
     id     = "transition-to-ia"
     status = "Enabled"
 
     transition {
-      days          = var.clean_lifecycle_days
+      days          = var.egress_lifecycle_days
       storage_class = "STANDARD_IA"
     }
   }
@@ -339,9 +357,23 @@ resource "aws_s3_bucket_ownership_controls" "quarantine" {
   }
 }
 
+resource "aws_s3_bucket_object_lock_configuration" "quarantine" {
+  count  = var.enable_object_lock ? 1 : 0
+  bucket = aws_s3_bucket.quarantine.id
+
+  rule {
+    default_retention {
+      mode = var.object_lock_retention_mode
+      days = var.object_lock_retention_days
+    }
+  }
+
+  depends_on = [aws_s3_bucket_versioning.quarantine]
+}
+
 resource "aws_s3_bucket_logging" "quarantine" {
   bucket        = aws_s3_bucket.quarantine.id
-  target_bucket = aws_s3_bucket.logs.id
+  target_bucket = local.log_bucket_id
   target_prefix = "quarantine/"
 }
 

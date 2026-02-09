@@ -1,6 +1,6 @@
-##############################################################################
+################################################################################
 # General
-##############################################################################
+################################################################################
 
 variable "name_prefix" {
   description = "Prefix applied to all resource names for namespacing."
@@ -18,24 +18,51 @@ variable "tags" {
   default     = {}
 }
 
-##############################################################################
+################################################################################
 # KMS
-##############################################################################
+################################################################################
 
-variable "kms_key_arn" {
-  description = "ARN of an existing KMS key. When null the module creates a new key."
-  type        = string
-  default     = null
-}
-
-##############################################################################
-# SFTP / Transfer Family
-##############################################################################
-
-variable "enable_sftp" {
-  description = "Whether to enable the SFTP upload path via AWS Transfer Family."
+variable "create_kms_key" {
+  description = "Whether to create a new KMS key. Set to false when providing your own key via kms_key_arn."
   type        = bool
   default     = true
+}
+
+variable "kms_key_deletion_window_days" {
+  description = "Number of days before a KMS key is permanently deleted after being scheduled for deletion."
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = var.kms_key_deletion_window_days >= 7 && var.kms_key_deletion_window_days <= 30
+    error_message = "kms_key_deletion_window_days must be between 7 and 30."
+  }
+}
+
+variable "kms_key_arn" {
+  description = "ARN of an existing KMS key. Required when create_kms_key is false. When null and create_kms_key is true, the module creates a new key."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.kms_key_arn == null || can(regex("^arn:aws:kms:", var.kms_key_arn))
+    error_message = "kms_key_arn must be a valid KMS key ARN starting with arn:aws:kms:."
+  }
+
+  validation {
+    condition     = var.create_kms_key || var.kms_key_arn != null
+    error_message = "kms_key_arn is required when create_kms_key is false."
+  }
+}
+
+################################################################################
+# SFTP / Transfer Family
+################################################################################
+
+variable "enable_sftp_ingress" {
+  description = "Whether to enable the SFTP upload path via AWS Transfer Family."
+  type        = bool
+  default     = false
 }
 
 variable "create_sftp_server" {
@@ -89,29 +116,90 @@ variable "sftp_users" {
   default = []
 }
 
-##############################################################################
-# S3 Lifecycle
-##############################################################################
+################################################################################
+# SFTP Egress / Transfer Family (read-only access to egress bucket)
+################################################################################
 
-variable "staging_lifecycle_days" {
-  description = "Number of days before objects in the staging bucket expire."
+variable "enable_sftp_egress" {
+  description = "Whether to enable an egress SFTP endpoint for the egress bucket (read-only)."
+  type        = bool
+  default     = false
+}
+
+variable "create_sftp_egress_server" {
+  description = "Create a new Transfer Family server for egress. Set false to attach to an existing server."
+  type        = bool
+  default     = true
+}
+
+variable "sftp_egress_server_id" {
+  description = "Existing Transfer Family server ID for egress. Required when create_sftp_egress_server is false."
+  type        = string
+  default     = null
+}
+
+variable "sftp_egress_endpoint_type" {
+  description = "Transfer Family endpoint type for egress — PUBLIC or VPC."
+  type        = string
+  default     = "PUBLIC"
+
+  validation {
+    condition     = contains(["PUBLIC", "VPC"], var.sftp_egress_endpoint_type)
+    error_message = "sftp_egress_endpoint_type must be PUBLIC or VPC."
+  }
+}
+
+variable "sftp_egress_vpc_id" {
+  description = "VPC ID for a VPC-type egress Transfer Family endpoint."
+  type        = string
+  default     = null
+}
+
+variable "sftp_egress_subnet_ids" {
+  description = "Subnet IDs for a VPC-type egress Transfer Family endpoint."
+  type        = list(string)
+  default     = []
+}
+
+variable "sftp_egress_allowed_cidrs" {
+  description = "CIDR blocks allowed to access the egress SFTP server (VPC security group)."
+  type        = list(string)
+  default     = []
+}
+
+variable "sftp_egress_users" {
+  description = "SFTP users for egress (read-only access to egress bucket)."
+  type = list(object({
+    username              = string
+    ssh_public_key        = string
+    home_directory_prefix = optional(string, "/")
+  }))
+  default = []
+}
+
+################################################################################
+# S3 Lifecycle
+################################################################################
+
+variable "ingress_lifecycle_days" {
+  description = "Number of days before objects in the ingress bucket expire."
   type        = number
   default     = 1
 
   validation {
-    condition     = var.staging_lifecycle_days > 0
-    error_message = "staging_lifecycle_days must be a positive number."
+    condition     = var.ingress_lifecycle_days > 0
+    error_message = "ingress_lifecycle_days must be a positive number."
   }
 }
 
-variable "clean_lifecycle_days" {
-  description = "Number of days before objects in the clean bucket transition to Infrequent Access."
+variable "egress_lifecycle_days" {
+  description = "Number of days before objects in the egress bucket transition to Infrequent Access."
   type        = number
   default     = 90
 
   validation {
-    condition     = var.clean_lifecycle_days > 0
-    error_message = "clean_lifecycle_days must be a positive number."
+    condition     = var.egress_lifecycle_days > 0
+    error_message = "egress_lifecycle_days must be a positive number."
   }
 }
 
@@ -126,9 +214,20 @@ variable "quarantine_lifecycle_days" {
   }
 }
 
-##############################################################################
+################################################################################
 # Lambda — File Router
-##############################################################################
+################################################################################
+
+variable "lambda_runtime" {
+  description = "Lambda runtime identifier for the file-router function."
+  type        = string
+  default     = "python3.12"
+
+  validation {
+    condition     = can(regex("^python3\\.", var.lambda_runtime))
+    error_message = "lambda_runtime must be a Python 3.x runtime (e.g. python3.12, python3.13)."
+  }
+}
 
 variable "lambda_memory_size" {
   description = "Memory (MB) allocated to the file-router Lambda function."
@@ -163,9 +262,9 @@ variable "lambda_reserved_concurrency" {
   }
 }
 
-##############################################################################
+################################################################################
 # Notifications
-##############################################################################
+################################################################################
 
 variable "sns_subscription_emails" {
   description = "Email addresses subscribed to the malware-alert SNS topic."
@@ -173,9 +272,9 @@ variable "sns_subscription_emails" {
   default     = []
 }
 
-##############################################################################
+################################################################################
 # Quarantine — Object Lock
-##############################################################################
+################################################################################
 
 variable "enable_object_lock" {
   description = "Enable S3 Object Lock on the quarantine bucket for tamper-proof retention."
@@ -183,9 +282,48 @@ variable "enable_object_lock" {
   default     = false
 }
 
-##############################################################################
+variable "object_lock_retention_days" {
+  description = "Default retention period in days for Object Lock on the quarantine bucket."
+  type        = number
+  default     = 365
+
+  validation {
+    condition     = var.object_lock_retention_days > 0
+    error_message = "object_lock_retention_days must be a positive number."
+  }
+}
+
+variable "object_lock_retention_mode" {
+  description = "Object Lock retention mode for the quarantine bucket (GOVERNANCE or COMPLIANCE)."
+  type        = string
+  default     = "GOVERNANCE"
+
+  validation {
+    condition     = contains(["GOVERNANCE", "COMPLIANCE"], var.object_lock_retention_mode)
+    error_message = "object_lock_retention_mode must be GOVERNANCE or COMPLIANCE."
+  }
+}
+
+################################################################################
 # Logging
-##############################################################################
+################################################################################
+
+variable "create_log_bucket" {
+  description = "Whether to create a managed S3 access-log bucket. Set to false when shipping logs to an existing bucket via log_bucket_name."
+  type        = bool
+  default     = true
+}
+
+variable "log_bucket_name" {
+  description = "Name of an existing S3 bucket for access-log shipping. Required when create_log_bucket is false. The caller is responsible for the external bucket's policy."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.create_log_bucket || var.log_bucket_name != null
+    error_message = "log_bucket_name is required when create_log_bucket is false."
+  }
+}
 
 variable "log_retention_days" {
   description = "CloudWatch Logs retention period in days."
@@ -195,5 +333,16 @@ variable "log_retention_days" {
   validation {
     condition     = contains([1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653], var.log_retention_days)
     error_message = "log_retention_days must be a valid CloudWatch Logs retention value."
+  }
+}
+
+variable "s3_log_retention_days" {
+  description = "Number of days to retain S3 access logs in the log bucket."
+  type        = number
+  default     = 90
+
+  validation {
+    condition     = var.s3_log_retention_days > 0
+    error_message = "s3_log_retention_days must be a positive number."
   }
 }

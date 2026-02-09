@@ -3,7 +3,8 @@
 ################################################################################
 
 locals {
-  server_id = var.create_sftp_server ? aws_transfer_server.this[0].id : var.existing_server_id
+  server_id  = var.create_sftp_server ? aws_transfer_server.this[0].id : var.existing_server_id
+  server_arn = var.create_sftp_server ? aws_transfer_server.this[0].arn : "arn:aws:transfer:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:server/${var.existing_server_id}"
   sftp_users = { for user in var.sftp_users : user.username => user }
 }
 
@@ -24,7 +25,7 @@ resource "aws_transfer_server" "this" {
   protocols              = ["SFTP"]
   identity_provider_type = "SERVICE_MANAGED"
   endpoint_type          = var.endpoint_type
-  security_policy_name   = "TransferSecurityPolicy-2024-01"
+  security_policy_name   = var.security_policy_name
 
   dynamic "endpoint_details" {
     for_each = var.endpoint_type == "VPC" ? [1] : []
@@ -64,7 +65,7 @@ resource "aws_security_group" "sftp" {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.egress_cidrs
     description = "HTTPS to AWS APIs"
   }
 
@@ -93,6 +94,12 @@ data "aws_iam_policy_document" "transfer_logging_assume" {
       test     = "StringEquals"
       variable = "aws:SourceAccount"
       values   = [data.aws_caller_identity.current.account_id]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = [local.server_arn]
     }
   }
 }
@@ -142,6 +149,12 @@ data "aws_iam_policy_document" "sftp_user_assume" {
       variable = "aws:SourceAccount"
       values   = [data.aws_caller_identity.current.account_id]
     }
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = [local.server_arn]
+    }
   }
 }
 
@@ -162,7 +175,7 @@ data "aws_iam_policy_document" "sftp_user" {
     actions = [
       "s3:ListBucket",
     ]
-    resources = [var.staging_bucket_arn]
+    resources = [var.bucket_arn]
 
     condition {
       test     = "StringLike"
@@ -176,20 +189,25 @@ data "aws_iam_policy_document" "sftp_user" {
   statement {
     sid    = "AllowObjectOperations"
     effect = "Allow"
-    actions = [
+    actions = var.read_only ? [
+      "s3:GetObject",
+      "s3:GetObjectVersion",
+    ] : [
       "s3:PutObject",
       "s3:GetObject",
       "s3:GetObjectVersion",
     ]
     resources = [
-      "${var.staging_bucket_arn}/${trimprefix(each.value.home_directory_prefix, "/")}*",
+      "${var.bucket_arn}/${trimprefix(each.value.home_directory_prefix, "/")}*",
     ]
   }
 
   statement {
     sid    = "AllowKMSAccess"
     effect = "Allow"
-    actions = [
+    actions = var.read_only ? [
+      "kms:Decrypt",
+    ] : [
       "kms:Decrypt",
       "kms:GenerateDataKey",
     ]
@@ -220,7 +238,7 @@ resource "aws_transfer_user" "this" {
 
   home_directory_mappings {
     entry  = "/"
-    target = "/${var.staging_bucket_name}${each.value.home_directory_prefix}"
+    target = "/${var.bucket_name}${each.value.home_directory_prefix}"
   }
 
   tags = var.tags

@@ -15,14 +15,14 @@ variable "kms_key_arn" {
   default     = null
 }
 
-variable "staging_lifecycle_days" {
-  description = "Days before staging objects expire."
+variable "ingress_lifecycle_days" {
+  description = "Days before ingress objects expire."
   type        = number
   default     = 1
 }
 
-variable "clean_lifecycle_days" {
-  description = "Days before clean objects transition to IA."
+variable "egress_lifecycle_days" {
+  description = "Days before egress objects transition to IA."
   type        = number
   default     = 90
 }
@@ -79,8 +79,35 @@ variable "subnet_ids" {
   type        = list(string)
 }
 
+variable "sftp_allowed_cidrs" {
+  description = "CIDR blocks allowed to access the SFTP server."
+  type        = list(string)
+}
+
 variable "sftp_users" {
   description = "SFTP users to provision."
+  type = list(object({
+    username              = string
+    ssh_public_key        = string
+    home_directory_prefix = optional(string, "/")
+  }))
+  default = []
+}
+
+variable "enable_sftp_egress" {
+  description = "Enable egress SFTP (read-only access to egress bucket)."
+  type        = bool
+  default     = false
+}
+
+variable "create_sftp_egress_server" {
+  description = "Create a new Transfer Family server for egress."
+  type        = bool
+  default     = true
+}
+
+variable "sftp_egress_users" {
+  description = "SFTP users for egress (read-only)."
   type = list(object({
     username              = string
     ssh_public_key        = string

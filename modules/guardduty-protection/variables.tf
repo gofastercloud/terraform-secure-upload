@@ -1,15 +1,15 @@
-variable "staging_bucket_name" {
-  description = "Name of the staging bucket to protect with GuardDuty Malware Protection"
+variable "ingress_bucket_name" {
+  description = "Name of the ingress bucket to protect with GuardDuty Malware Protection"
   type        = string
 }
 
-variable "staging_bucket_arn" {
-  description = "ARN of the staging bucket"
+variable "ingress_bucket_arn" {
+  description = "ARN of the ingress bucket"
   type        = string
 }
 
 variable "kms_key_arn" {
-  description = "KMS key ARN for decrypting objects in the staging bucket"
+  description = "KMS key ARN for decrypting objects in the ingress bucket"
   type        = string
 }
 

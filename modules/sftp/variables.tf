@@ -53,16 +53,39 @@ variable "allowed_cidrs" {
     condition     = length(var.allowed_cidrs) > 0 || !var.create_sftp_server || var.endpoint_type != "VPC"
     error_message = "allowed_cidrs must not be empty when creating a VPC-type SFTP server."
   }
+
+  validation {
+    condition     = !contains(var.allowed_cidrs, "0.0.0.0/0")
+    error_message = "allowed_cidrs must not contain 0.0.0.0/0 — this would allow unrestricted access."
+  }
 }
 
-variable "staging_bucket_name" {
-  description = "Name of the staging S3 bucket"
+variable "egress_cidrs" {
+  description = "CIDR blocks for security group egress (HTTPS to AWS APIs). Defaults to 0.0.0.0/0; restrict to VPC CIDR or AWS service ranges for tighter security."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+variable "bucket_name" {
+  description = "Name of the S3 bucket (ingress for uploads, egress for verified downloads)"
   type        = string
 }
 
-variable "staging_bucket_arn" {
-  description = "ARN of the staging S3 bucket"
+variable "bucket_arn" {
+  description = "ARN of the S3 bucket (ingress for uploads, egress for verified downloads)"
   type        = string
+}
+
+variable "read_only" {
+  description = "When true, SFTP users get read-only access (GetObject/ListBucket only, no PutObject). Used for egress."
+  type        = bool
+  default     = false
+}
+
+variable "security_policy_name" {
+  description = "Transfer Family security policy. See AWS docs for available policies."
+  type        = string
+  default     = "TransferSecurityPolicy-2024-01"
 }
 
 variable "kms_key_arn" {

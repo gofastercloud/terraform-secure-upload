@@ -15,7 +15,7 @@ run "invalid_endpoint_type" {
 
   variables {
     name_prefix        = "test-val"
-    enable_sftp        = true
+    enable_sftp_ingress        = true
     sftp_endpoint_type = "INVALID"
   }
 
@@ -25,56 +25,56 @@ run "invalid_endpoint_type" {
 }
 
 ################################################################################
-# Test: Negative staging_lifecycle_days fails
+# Test: Negative ingress_lifecycle_days fails
 ################################################################################
 
-run "negative_staging_lifecycle" {
+run "negative_ingress_lifecycle" {
   command = plan
 
   variables {
     name_prefix           = "test-val"
-    enable_sftp           = false
-    staging_lifecycle_days = -1
+    enable_sftp_ingress           = false
+    ingress_lifecycle_days = -1
   }
 
   expect_failures = [
-    var.staging_lifecycle_days,
+    var.ingress_lifecycle_days,
   ]
 }
 
 ################################################################################
-# Test: Zero staging_lifecycle_days fails
+# Test: Zero ingress_lifecycle_days fails
 ################################################################################
 
-run "zero_staging_lifecycle" {
+run "zero_ingress_lifecycle" {
   command = plan
 
   variables {
     name_prefix           = "test-val"
-    enable_sftp           = false
-    staging_lifecycle_days = 0
+    enable_sftp_ingress           = false
+    ingress_lifecycle_days = 0
   }
 
   expect_failures = [
-    var.staging_lifecycle_days,
+    var.ingress_lifecycle_days,
   ]
 }
 
 ################################################################################
-# Test: Negative clean_lifecycle_days fails
+# Test: Negative egress_lifecycle_days fails
 ################################################################################
 
-run "negative_clean_lifecycle" {
+run "negative_egress_lifecycle" {
   command = plan
 
   variables {
     name_prefix          = "test-val"
-    enable_sftp          = false
-    clean_lifecycle_days = -5
+    enable_sftp_ingress          = false
+    egress_lifecycle_days = -5
   }
 
   expect_failures = [
-    var.clean_lifecycle_days,
+    var.egress_lifecycle_days,
   ]
 }
 
@@ -87,7 +87,7 @@ run "negative_quarantine_lifecycle" {
 
   variables {
     name_prefix              = "test-val"
-    enable_sftp              = false
+    enable_sftp_ingress              = false
     quarantine_lifecycle_days = -10
   }
 
@@ -105,7 +105,7 @@ run "invalid_name_prefix_uppercase" {
 
   variables {
     name_prefix = "Test-Upload"
-    enable_sftp = false
+    enable_sftp_ingress = false
   }
 
   expect_failures = [
@@ -122,11 +122,49 @@ run "invalid_name_prefix_special_chars" {
 
   variables {
     name_prefix = "test_upload!"
-    enable_sftp = false
+    enable_sftp_ingress = false
   }
 
   expect_failures = [
     var.name_prefix,
+  ]
+}
+
+################################################################################
+# Test: create_kms_key=false without kms_key_arn should fail
+################################################################################
+
+run "kms_key_required_when_not_creating" {
+  command = plan
+
+  variables {
+    name_prefix    = "test-val"
+    enable_sftp_ingress    = false
+    create_kms_key = false
+    kms_key_arn    = null
+  }
+
+  expect_failures = [
+    var.kms_key_arn,
+  ]
+}
+
+################################################################################
+# Test: create_log_bucket=false without log_bucket_name fails
+################################################################################
+
+run "log_bucket_name_required_when_not_creating" {
+  command = plan
+
+  variables {
+    name_prefix       = "test-val"
+    enable_sftp_ingress       = false
+    create_log_bucket = false
+    log_bucket_name   = null
+  }
+
+  expect_failures = [
+    var.log_bucket_name,
   ]
 }
 
@@ -139,7 +177,7 @@ run "lambda_memory_too_low" {
 
   variables {
     name_prefix       = "test-val"
-    enable_sftp       = false
+    enable_sftp_ingress       = false
     lambda_memory_size = 64
   }
 
@@ -157,7 +195,7 @@ run "lambda_memory_too_high" {
 
   variables {
     name_prefix       = "test-val"
-    enable_sftp       = false
+    enable_sftp_ingress       = false
     lambda_memory_size = 20480
   }
 
@@ -175,7 +213,7 @@ run "lambda_timeout_zero" {
 
   variables {
     name_prefix    = "test-val"
-    enable_sftp    = false
+    enable_sftp_ingress    = false
     lambda_timeout = 0
   }
 
@@ -193,7 +231,7 @@ run "lambda_timeout_exceeds_max" {
 
   variables {
     name_prefix    = "test-val"
-    enable_sftp    = false
+    enable_sftp_ingress    = false
     lambda_timeout = 901
   }
 
@@ -211,7 +249,7 @@ run "invalid_log_retention" {
 
   variables {
     name_prefix        = "test-val"
-    enable_sftp        = false
+    enable_sftp_ingress        = false
     log_retention_days = 42
   }
 
@@ -229,7 +267,7 @@ run "lambda_concurrency_zero" {
 
   variables {
     name_prefix                 = "test-val"
-    enable_sftp                 = false
+    enable_sftp_ingress                 = false
     lambda_reserved_concurrency = 0
   }
 

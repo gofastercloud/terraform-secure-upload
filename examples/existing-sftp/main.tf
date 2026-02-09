@@ -8,7 +8,7 @@ module "secure_upload" {
   name_prefix = var.name_prefix
 
   # Attach to an existing Transfer Family server
-  enable_sftp        = true
+  enable_sftp_ingress        = true
   create_sftp_server = false
   sftp_server_id     = var.sftp_server_id
 

@@ -1,9 +1,9 @@
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
-# ------------------------------------------------------------------------------
+################################################################################
 # Lambda Package
-# ------------------------------------------------------------------------------
+################################################################################
 
 data "archive_file" "file_router" {
   type        = "zip"
@@ -11,9 +11,9 @@ data "archive_file" "file_router" {
   output_path = "${path.module}/../../.build/file_router.zip"
 }
 
-# ------------------------------------------------------------------------------
+################################################################################
 # CloudWatch Log Group
-# ------------------------------------------------------------------------------
+################################################################################
 
 resource "aws_cloudwatch_log_group" "file_router" {
   name              = "/aws/lambda/${var.name_prefix}-file-router"
@@ -22,15 +22,37 @@ resource "aws_cloudwatch_log_group" "file_router" {
   tags              = var.tags
 }
 
-# ------------------------------------------------------------------------------
+################################################################################
 # SQS Dead Letter Queue
-# ------------------------------------------------------------------------------
+################################################################################
 
 resource "aws_sqs_queue" "dlq" {
   name                       = "${var.name_prefix}-file-router-dlq"
   kms_master_key_id          = var.kms_key_arn
-  kms_data_key_reuse_period_seconds = 300
+  kms_data_key_reuse_period_seconds = var.sqs_kms_data_key_reuse_seconds
   tags                       = var.tags
+}
+
+resource "aws_cloudwatch_metric_alarm" "dlq_messages" {
+  alarm_name          = "${var.name_prefix}-file-router-dlq-alarm"
+  alarm_description   = "Alert when file-router Lambda dead letter queue has messages"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  namespace           = "AWS/SQS"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 0
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    QueueName = aws_sqs_queue.dlq.name
+  }
+
+  alarm_actions = [aws_sns_topic.malware_alerts.arn]
+  ok_actions    = [aws_sns_topic.malware_alerts.arn]
+
+  tags = var.tags
 }
 
 resource "aws_sqs_queue_policy" "dlq" {
@@ -55,9 +77,9 @@ resource "aws_sqs_queue_policy" "dlq" {
   })
 }
 
-# ------------------------------------------------------------------------------
+################################################################################
 # SNS Topic
-# ------------------------------------------------------------------------------
+################################################################################
 
 resource "aws_sns_topic" "malware_alerts" {
   name              = "${var.name_prefix}-malware-alerts"
@@ -94,9 +116,9 @@ resource "aws_sns_topic_subscription" "email" {
   endpoint  = each.value
 }
 
-# ------------------------------------------------------------------------------
+################################################################################
 # IAM Role for Lambda
-# ------------------------------------------------------------------------------
+################################################################################
 
 resource "aws_iam_role" "file_router" {
   name = "${var.name_prefix}-file-router"
@@ -108,6 +130,11 @@ resource "aws_iam_role" "file_router" {
         Effect    = "Allow"
         Principal = { Service = "lambda.amazonaws.com" }
         Action    = "sts:AssumeRole"
+        Condition = {
+          StringEquals = {
+            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+          }
+        }
       }
     ]
   })
@@ -123,23 +150,24 @@ resource "aws_iam_role_policy" "file_router" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "StagingBucketRead"
+        Sid    = "IngressBucketRead"
         Effect = "Allow"
         Action = [
           "s3:GetObject",
           "s3:GetObjectTagging",
+          "s3:HeadObject",
           "s3:DeleteObject",
         ]
-        Resource = "${var.staging_bucket_arn}/*"
+        Resource = "${var.ingress_bucket_arn}/*"
       },
       {
-        Sid    = "CleanBucketWrite"
+        Sid    = "EgressBucketWrite"
         Effect = "Allow"
         Action = [
           "s3:PutObject",
           "s3:PutObjectTagging",
         ]
-        Resource = "${var.clean_bucket_arn}/*"
+        Resource = "${var.egress_bucket_arn}/*"
       },
       {
         Sid    = "QuarantineBucketWrite"
@@ -175,7 +203,6 @@ resource "aws_iam_role_policy" "file_router" {
         Sid    = "CloudWatchLogs"
         Effect = "Allow"
         Action = [
-          "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents",
         ]
@@ -185,9 +212,9 @@ resource "aws_iam_role_policy" "file_router" {
   })
 }
 
-# ------------------------------------------------------------------------------
+################################################################################
 # Lambda Function
-# ------------------------------------------------------------------------------
+################################################################################
 
 resource "aws_lambda_function" "file_router" {
   function_name    = "${var.name_prefix}-file-router"
@@ -195,7 +222,7 @@ resource "aws_lambda_function" "file_router" {
   filename         = data.archive_file.file_router.output_path
   source_code_hash = data.archive_file.file_router.output_base64sha256
   handler          = "file_router.handler"
-  runtime          = "python3.12"
+  runtime          = var.lambda_runtime
   role             = aws_iam_role.file_router.arn
   memory_size      = var.lambda_memory_size
   timeout          = var.lambda_timeout
@@ -210,9 +237,11 @@ resource "aws_lambda_function" "file_router" {
 
   environment {
     variables = {
-      CLEAN_BUCKET      = var.clean_bucket_name
+      INGRESS_BUCKET    = var.ingress_bucket_name
+      EGRESS_BUCKET     = var.egress_bucket_name
       QUARANTINE_BUCKET = var.quarantine_bucket_name
       SNS_TOPIC_ARN     = aws_sns_topic.malware_alerts.arn
+      KMS_KEY_ARN       = var.kms_key_arn
     }
   }
 
@@ -224,9 +253,9 @@ resource "aws_lambda_function" "file_router" {
   tags = var.tags
 }
 
-# ------------------------------------------------------------------------------
+################################################################################
 # EventBridge Rule
-# ------------------------------------------------------------------------------
+################################################################################
 
 resource "aws_cloudwatch_event_rule" "scan_result" {
   name        = "${var.name_prefix}-malware-scan-result"
@@ -237,7 +266,7 @@ resource "aws_cloudwatch_event_rule" "scan_result" {
     detail-type = ["GuardDuty Malware Protection Object Scan Result"]
     detail = {
       s3ObjectDetails = {
-        bucketName = [var.staging_bucket_name]
+        bucketName = [var.ingress_bucket_name]
       }
     }
   })
@@ -248,6 +277,15 @@ resource "aws_cloudwatch_event_rule" "scan_result" {
 resource "aws_cloudwatch_event_target" "lambda" {
   rule = aws_cloudwatch_event_rule.scan_result.name
   arn  = aws_lambda_function.file_router.arn
+
+  retry_policy {
+    maximum_event_age_in_seconds = 3600
+    maximum_retry_attempts       = 3
+  }
+
+  dead_letter_config {
+    arn = aws_sqs_queue.dlq.arn
+  }
 }
 
 resource "aws_lambda_permission" "eventbridge" {

@@ -8,14 +8,14 @@ provider "aws" {
 
 variables {
   name_prefix = "test-s3sec"
-  enable_sftp = false
+  enable_sftp_ingress = false
 }
 
 ################################################################################
 # Test: All buckets have versioning enabled
 ################################################################################
 
-run "staging_bucket_versioning" {
+run "ingress_bucket_versioning" {
   command = plan
 
   module {
@@ -25,19 +25,19 @@ run "staging_bucket_versioning" {
   variables {
     name_prefix              = "test-s3sec"
     kms_key_arn              = "arn:aws:kms:us-east-1:123456789012:key/test-key-id"
-    staging_lifecycle_days   = 1
-    clean_lifecycle_days     = 90
+    ingress_lifecycle_days   = 1
+    egress_lifecycle_days     = 90
     quarantine_lifecycle_days = 365
   }
 
   assert {
-    condition     = aws_s3_bucket_versioning.staging.versioning_configuration[0].status == "Enabled"
-    error_message = "Staging bucket must have versioning enabled"
+    condition     = aws_s3_bucket_versioning.ingress.versioning_configuration[0].status == "Enabled"
+    error_message = "Ingress bucket must have versioning enabled"
   }
 
   assert {
-    condition     = aws_s3_bucket_versioning.clean.versioning_configuration[0].status == "Enabled"
-    error_message = "Clean bucket must have versioning enabled"
+    condition     = aws_s3_bucket_versioning.egress.versioning_configuration[0].status == "Enabled"
+    error_message = "Egress bucket must have versioning enabled"
   }
 
   assert {
@@ -65,19 +65,19 @@ run "bucket_encryption" {
   variables {
     name_prefix              = "test-s3sec"
     kms_key_arn              = "arn:aws:kms:us-east-1:123456789012:key/test-key-id"
-    staging_lifecycle_days   = 1
-    clean_lifecycle_days     = 90
+    ingress_lifecycle_days   = 1
+    egress_lifecycle_days     = 90
     quarantine_lifecycle_days = 365
   }
 
   assert {
-    condition     = aws_s3_bucket_server_side_encryption_configuration.staging.rule[0].apply_server_side_encryption_by_default[0].sse_algorithm == "aws:kms"
-    error_message = "Staging bucket must use KMS encryption"
+    condition     = aws_s3_bucket_server_side_encryption_configuration.ingress.rule[0].apply_server_side_encryption_by_default[0].sse_algorithm == "aws:kms"
+    error_message = "Ingress bucket must use KMS encryption"
   }
 
   assert {
-    condition     = aws_s3_bucket_server_side_encryption_configuration.clean.rule[0].apply_server_side_encryption_by_default[0].sse_algorithm == "aws:kms"
-    error_message = "Clean bucket must use KMS encryption"
+    condition     = aws_s3_bucket_server_side_encryption_configuration.egress.rule[0].apply_server_side_encryption_by_default[0].sse_algorithm == "aws:kms"
+    error_message = "Egress bucket must use KMS encryption"
   }
 
   assert {
@@ -91,13 +91,13 @@ run "bucket_encryption" {
   }
 
   assert {
-    condition     = aws_s3_bucket_server_side_encryption_configuration.staging.rule[0].bucket_key_enabled == true
-    error_message = "Staging bucket must have bucket key enabled"
+    condition     = aws_s3_bucket_server_side_encryption_configuration.ingress.rule[0].bucket_key_enabled == true
+    error_message = "Ingress bucket must have bucket key enabled"
   }
 
   assert {
-    condition     = aws_s3_bucket_server_side_encryption_configuration.clean.rule[0].bucket_key_enabled == true
-    error_message = "Clean bucket must have bucket key enabled"
+    condition     = aws_s3_bucket_server_side_encryption_configuration.egress.rule[0].bucket_key_enabled == true
+    error_message = "Egress bucket must have bucket key enabled"
   }
 
   assert {
@@ -120,51 +120,51 @@ run "block_public_access" {
   variables {
     name_prefix              = "test-s3sec"
     kms_key_arn              = "arn:aws:kms:us-east-1:123456789012:key/test-key-id"
-    staging_lifecycle_days   = 1
-    clean_lifecycle_days     = 90
+    ingress_lifecycle_days   = 1
+    egress_lifecycle_days     = 90
     quarantine_lifecycle_days = 365
   }
 
-  # Staging bucket
+  # Ingress bucket
   assert {
-    condition     = aws_s3_bucket_public_access_block.staging.block_public_acls == true
-    error_message = "Staging bucket must block public ACLs"
+    condition     = aws_s3_bucket_public_access_block.ingress.block_public_acls == true
+    error_message = "Ingress bucket must block public ACLs"
   }
 
   assert {
-    condition     = aws_s3_bucket_public_access_block.staging.block_public_policy == true
-    error_message = "Staging bucket must block public policy"
+    condition     = aws_s3_bucket_public_access_block.ingress.block_public_policy == true
+    error_message = "Ingress bucket must block public policy"
   }
 
   assert {
-    condition     = aws_s3_bucket_public_access_block.staging.ignore_public_acls == true
-    error_message = "Staging bucket must ignore public ACLs"
+    condition     = aws_s3_bucket_public_access_block.ingress.ignore_public_acls == true
+    error_message = "Ingress bucket must ignore public ACLs"
   }
 
   assert {
-    condition     = aws_s3_bucket_public_access_block.staging.restrict_public_buckets == true
-    error_message = "Staging bucket must restrict public buckets"
+    condition     = aws_s3_bucket_public_access_block.ingress.restrict_public_buckets == true
+    error_message = "Ingress bucket must restrict public buckets"
   }
 
-  # Clean bucket
+  # Egress bucket
   assert {
-    condition     = aws_s3_bucket_public_access_block.clean.block_public_acls == true
-    error_message = "Clean bucket must block public ACLs"
-  }
-
-  assert {
-    condition     = aws_s3_bucket_public_access_block.clean.block_public_policy == true
-    error_message = "Clean bucket must block public policy"
+    condition     = aws_s3_bucket_public_access_block.egress.block_public_acls == true
+    error_message = "Egress bucket must block public ACLs"
   }
 
   assert {
-    condition     = aws_s3_bucket_public_access_block.clean.ignore_public_acls == true
-    error_message = "Clean bucket must ignore public ACLs"
+    condition     = aws_s3_bucket_public_access_block.egress.block_public_policy == true
+    error_message = "Egress bucket must block public policy"
   }
 
   assert {
-    condition     = aws_s3_bucket_public_access_block.clean.restrict_public_buckets == true
-    error_message = "Clean bucket must restrict public buckets"
+    condition     = aws_s3_bucket_public_access_block.egress.ignore_public_acls == true
+    error_message = "Egress bucket must ignore public ACLs"
+  }
+
+  assert {
+    condition     = aws_s3_bucket_public_access_block.egress.restrict_public_buckets == true
+    error_message = "Egress bucket must restrict public buckets"
   }
 
   # Quarantine bucket
@@ -224,19 +224,19 @@ run "bucket_ownership" {
   variables {
     name_prefix              = "test-s3sec"
     kms_key_arn              = "arn:aws:kms:us-east-1:123456789012:key/test-key-id"
-    staging_lifecycle_days   = 1
-    clean_lifecycle_days     = 90
+    ingress_lifecycle_days   = 1
+    egress_lifecycle_days     = 90
     quarantine_lifecycle_days = 365
   }
 
   assert {
-    condition     = aws_s3_bucket_ownership_controls.staging.rule[0].object_ownership == "BucketOwnerEnforced"
-    error_message = "Staging bucket must enforce BucketOwnerEnforced"
+    condition     = aws_s3_bucket_ownership_controls.ingress.rule[0].object_ownership == "BucketOwnerEnforced"
+    error_message = "Ingress bucket must enforce BucketOwnerEnforced"
   }
 
   assert {
-    condition     = aws_s3_bucket_ownership_controls.clean.rule[0].object_ownership == "BucketOwnerEnforced"
-    error_message = "Clean bucket must enforce BucketOwnerEnforced"
+    condition     = aws_s3_bucket_ownership_controls.egress.rule[0].object_ownership == "BucketOwnerEnforced"
+    error_message = "Egress bucket must enforce BucketOwnerEnforced"
   }
 
   assert {
@@ -264,19 +264,19 @@ run "bucket_logging" {
   variables {
     name_prefix              = "test-s3sec"
     kms_key_arn              = "arn:aws:kms:us-east-1:123456789012:key/test-key-id"
-    staging_lifecycle_days   = 1
-    clean_lifecycle_days     = 90
+    ingress_lifecycle_days   = 1
+    egress_lifecycle_days     = 90
     quarantine_lifecycle_days = 365
   }
 
   assert {
-    condition     = aws_s3_bucket_logging.staging.target_prefix == "staging/"
-    error_message = "Staging bucket logging should use 'staging/' prefix"
+    condition     = aws_s3_bucket_logging.ingress.target_prefix == "ingress/"
+    error_message = "Ingress bucket logging should use 'ingress/' prefix"
   }
 
   assert {
-    condition     = aws_s3_bucket_logging.clean.target_prefix == "clean/"
-    error_message = "Clean bucket logging should use 'clean/' prefix"
+    condition     = aws_s3_bucket_logging.egress.target_prefix == "egress/"
+    error_message = "Egress bucket logging should use 'egress/' prefix"
   }
 
   assert {
@@ -299,24 +299,24 @@ run "lifecycle_rules" {
   variables {
     name_prefix              = "test-s3sec"
     kms_key_arn              = "arn:aws:kms:us-east-1:123456789012:key/test-key-id"
-    staging_lifecycle_days   = 3
-    clean_lifecycle_days     = 60
+    ingress_lifecycle_days   = 3
+    egress_lifecycle_days     = 60
     quarantine_lifecycle_days = 180
   }
 
   assert {
-    condition     = aws_s3_bucket_lifecycle_configuration.staging.rule[0].expiration[0].days == 3
-    error_message = "Staging lifecycle should expire after 3 days"
+    condition     = aws_s3_bucket_lifecycle_configuration.ingress.rule[0].expiration[0].days == 3
+    error_message = "Ingress lifecycle should expire after 3 days"
   }
 
   assert {
-    condition     = aws_s3_bucket_lifecycle_configuration.clean.rule[0].transition[0].days == 60
-    error_message = "Clean lifecycle should transition after 60 days"
+    condition     = aws_s3_bucket_lifecycle_configuration.egress.rule[0].transition[0].days == 60
+    error_message = "Egress lifecycle should transition after 60 days"
   }
 
   assert {
-    condition     = aws_s3_bucket_lifecycle_configuration.clean.rule[0].transition[0].storage_class == "STANDARD_IA"
-    error_message = "Clean lifecycle should transition to STANDARD_IA"
+    condition     = aws_s3_bucket_lifecycle_configuration.egress.rule[0].transition[0].storage_class == "STANDARD_IA"
+    error_message = "Egress lifecycle should transition to STANDARD_IA"
   }
 
   assert {

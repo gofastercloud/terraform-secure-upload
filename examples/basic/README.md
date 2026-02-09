@@ -1,6 +1,6 @@
 # Basic Example
 
-Minimal deployment of `terraform-secure-upload` using direct S3 uploads only (no SFTP). The module creates a KMS key, four S3 buckets (staging, clean, quarantine, logs), GuardDuty Malware Protection, and the file-router Lambda.
+Minimal deployment of `terraform-secure-upload` using direct S3 uploads only (no SFTP). The module creates a KMS key, four S3 buckets (ingress, egress, quarantine, logs), GuardDuty Malware Protection, and the file-router Lambda.
 
 ## Usage
 
@@ -15,5 +15,5 @@ terraform apply
 Upload a test file:
 
 ```bash
-aws s3 cp test-file.txt s3://$(terraform output -raw staging_bucket_id)/
+aws s3 cp test-file.txt s3://$(terraform output -raw ingress_bucket_id)/
 ```

@@ -1,39 +1,39 @@
 ################################################################################
-# Staging Bucket
+# Ingress Bucket
 ################################################################################
 
-output "staging_bucket_id" {
-  description = "ID of the staging bucket"
-  value       = aws_s3_bucket.staging.id
+output "ingress_bucket_id" {
+  description = "ID of the ingress bucket"
+  value       = aws_s3_bucket.ingress.id
 }
 
-output "staging_bucket_arn" {
-  description = "ARN of the staging bucket"
-  value       = aws_s3_bucket.staging.arn
+output "ingress_bucket_arn" {
+  description = "ARN of the ingress bucket"
+  value       = aws_s3_bucket.ingress.arn
 }
 
-output "staging_bucket" {
-  description = "Domain name of the staging bucket"
-  value       = aws_s3_bucket.staging.bucket_domain_name
+output "ingress_bucket" {
+  description = "Domain name of the ingress bucket"
+  value       = aws_s3_bucket.ingress.bucket_domain_name
 }
 
 ################################################################################
-# Clean Bucket
+# Egress Bucket
 ################################################################################
 
-output "clean_bucket_id" {
-  description = "ID of the clean bucket"
-  value       = aws_s3_bucket.clean.id
+output "egress_bucket_id" {
+  description = "ID of the egress bucket"
+  value       = aws_s3_bucket.egress.id
 }
 
-output "clean_bucket_arn" {
-  description = "ARN of the clean bucket"
-  value       = aws_s3_bucket.clean.arn
+output "egress_bucket_arn" {
+  description = "ARN of the egress bucket"
+  value       = aws_s3_bucket.egress.arn
 }
 
-output "clean_bucket" {
-  description = "Domain name of the clean bucket"
-  value       = aws_s3_bucket.clean.bucket_domain_name
+output "egress_bucket" {
+  description = "Domain name of the egress bucket"
+  value       = aws_s3_bucket.egress.bucket_domain_name
 }
 
 ################################################################################
@@ -60,16 +60,16 @@ output "quarantine_bucket" {
 ################################################################################
 
 output "logs_bucket_id" {
-  description = "ID of the logs bucket"
-  value       = aws_s3_bucket.logs.id
+  description = "ID of the logs bucket (module-created or external)"
+  value       = local.log_bucket_id
 }
 
 output "logs_bucket_arn" {
-  description = "ARN of the logs bucket"
-  value       = aws_s3_bucket.logs.arn
+  description = "ARN of the logs bucket (null when using an external bucket)"
+  value       = var.create_log_bucket ? aws_s3_bucket.logs[0].arn : null
 }
 
 output "logs_bucket" {
-  description = "Domain name of the logs bucket"
-  value       = aws_s3_bucket.logs.bucket_domain_name
+  description = "Domain name of the logs bucket (null when using an external bucket)"
+  value       = var.create_log_bucket ? aws_s3_bucket.logs[0].bucket_domain_name : null
 }

@@ -1,11 +1,11 @@
-output "staging_bucket_id" {
-  description = "Name of the staging bucket."
-  value       = module.secure_upload.staging_bucket_id
+output "ingress_bucket_id" {
+  description = "Name of the ingress bucket."
+  value       = module.secure_upload.ingress_bucket_id
 }
 
-output "clean_bucket_id" {
-  description = "Name of the clean bucket."
-  value       = module.secure_upload.clean_bucket_id
+output "egress_bucket_id" {
+  description = "Name of the egress bucket."
+  value       = module.secure_upload.egress_bucket_id
 }
 
 output "quarantine_bucket_id" {
@@ -26,6 +26,16 @@ output "sftp_server_id" {
 output "sftp_server_endpoint" {
   description = "SFTP server endpoint hostname."
   value       = module.secure_upload.sftp_server_endpoint
+}
+
+output "sftp_egress_server_id" {
+  description = "Egress Transfer Family server ID."
+  value       = module.secure_upload.sftp_egress_server_id
+}
+
+output "sftp_egress_server_endpoint" {
+  description = "Egress SFTP server endpoint hostname."
+  value       = module.secure_upload.sftp_egress_server_endpoint
 }
 
 output "sns_topic_arn" {

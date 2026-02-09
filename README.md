@@ -11,13 +11,13 @@ A Terraform module that creates a secure file upload pipeline on AWS with automa
                           └──────┬──────┘
                                  │
           ┌─────────────┐        │
-          │    SFTP      │       │
+          │ SFTP Ingress │       │
           │ (Transfer    ├───────┤
           │  Family)     │       │
           └─────────────┘        │
                                  ▼
                       ┌─────────────────────┐
-                      │   Staging Bucket     │
+                      │   Ingress Bucket     │
                       │  (KMS encrypted)     │
                       └──────────┬──────────┘
                                  │
@@ -41,17 +41,25 @@ A Terraform module that creates a secure file upload pipeline on AWS with automa
               ┌──────────────┴──────────┐           │
               ▼                         ▼           ▼
    ┌───────────────────┐   ┌───────────────────┐  ┌──────────┐
-   │   Clean Bucket    │   │Quarantine Bucket   │  │   SNS    │
-   │ (scan passed)     │   │(malware detected)  │  │  Alert   │
-   └───────────────────┘   └───────────────────┘  └──────────┘
+   │  Egress Bucket    │   │Quarantine Bucket   │  │   SNS    │
+   │   (verified)      │   │(malware detected)  │  │  Alert   │
+   └────────┬──────────┘   └───────────────────┘  └──────────┘
+            │
+            ▼ (optional)
+   ┌─────────────────┐
+   │  SFTP Egress    │
+   │ (read-only,     │
+   │  Transfer Family)│
+   └─────────────────┘
 ```
 
 ## Features
 
-- **Automatic malware scanning** — GuardDuty Malware Protection scans every object uploaded to the staging bucket
-- **Automated file routing** — Lambda moves clean files to the clean bucket and infected files to quarantine
+- **Automatic malware scanning** — GuardDuty Malware Protection scans every object uploaded to the ingress bucket
+- **Automated file routing** — Lambda moves verified files to the egress bucket and infected files to quarantine
 - **SNS alerting** — email notifications when malware is detected
 - **SFTP upload support** — optional AWS Transfer Family server with per-user home directories
+- **SFTP egress** — optional read-only SFTP endpoint for pulling verified files from the egress bucket
 - **KMS encryption** — all buckets encrypted with a shared KMS key (BYO or auto-created)
 - **S3 Object Lock** — optional tamper-proof retention on the quarantine bucket
 - **Least-privilege IAM** — scoped IAM roles for GuardDuty, Lambda, Transfer Family, and SFTP users
@@ -64,8 +72,8 @@ A Terraform module that creates a secure file upload pipeline on AWS with automa
 
 | Requirement | Version |
 |---|---|
-| Terraform / OpenTofu | `>= 1.5` |
-| AWS Provider | `~> 5.0` |
+| Terraform / OpenTofu | `>= 1.9` |
+| AWS Provider | `>= 5.60, < 6.0` |
 | Archive Provider | `~> 2.0` |
 | AWS Account | GuardDuty Malware Protection for S3 must be available in your region |
 
@@ -76,7 +84,7 @@ module "secure_upload" {
   source = "path/to/terraform-secure-upload"
 
   name_prefix = "myapp"
-  enable_sftp = false
+  enable_sftp_ingress = false
 }
 ```
 
@@ -89,11 +97,12 @@ module "secure_upload" {
   name_prefix = "myapp"
 
   # KMS — bring your own key or let the module create one
-  kms_key_arn = aws_kms_key.custom.arn
+  create_kms_key = false
+  kms_key_arn    = aws_kms_key.custom.arn
 
   # S3 lifecycle
-  staging_lifecycle_days    = 1
-  clean_lifecycle_days      = 90
+  ingress_lifecycle_days    = 1
+  egress_lifecycle_days      = 90
   quarantine_lifecycle_days = 365
   enable_object_lock        = true
 
@@ -109,11 +118,12 @@ module "secure_upload" {
   log_retention_days = 180
 
   # SFTP
-  enable_sftp        = true
+  enable_sftp_ingress        = true
   create_sftp_server = true
-  sftp_endpoint_type = "VPC"
-  sftp_vpc_id        = "vpc-0abc123"
-  sftp_subnet_ids    = ["subnet-aaa", "subnet-bbb"]
+  sftp_endpoint_type  = "VPC"
+  sftp_vpc_id         = "vpc-0abc123"
+  sftp_subnet_ids     = ["subnet-aaa", "subnet-bbb"]
+  sftp_allowed_cidrs  = ["10.0.0.0/8"]
 
   sftp_users = [
     {
@@ -125,6 +135,15 @@ module "secure_upload" {
       username              = "partner-b"
       ssh_public_key        = file("keys/partner-b.pub")
       home_directory_prefix = "/uploads/partner-b/"
+    },
+  ]
+
+  # SFTP Egress — read-only pull from egress bucket
+  enable_sftp_egress = true
+  sftp_egress_users = [
+    {
+      username       = "receiver-a"
+      ssh_public_key = file("keys/receiver-a.pub")
     },
   ]
 
@@ -141,76 +160,187 @@ module "secure_upload" {
 |---|---|---|---|---|
 | `name_prefix` | Prefix applied to all resource names for namespacing. Must be lowercase alphanumeric with hyphens. | `string` | — | yes |
 | `tags` | Tags applied to every resource created by this module. | `map(string)` | `{}` | no |
-| `kms_key_arn` | ARN of an existing KMS key. When `null` the module creates a new key. | `string` | `null` | no |
-| `enable_sftp` | Whether to enable the SFTP upload path via AWS Transfer Family. | `bool` | `true` | no |
+| `create_kms_key` | Whether to create a new KMS key. Set to `false` when providing your own key via `kms_key_arn`. | `bool` | `true` | no |
+| `kms_key_deletion_window_days` | Days before a KMS key is permanently deleted after scheduling deletion (7–30). | `number` | `30` | no |
+| `kms_key_arn` | ARN of an existing KMS key. Required when `create_kms_key` is `false`. | `string` | `null` | no |
+| `enable_sftp_ingress` | Whether to enable the SFTP upload path via AWS Transfer Family. | `bool` | `false` | no |
 | `create_sftp_server` | Create a new Transfer Family server. Set `false` to attach to an existing server. | `bool` | `true` | no |
 | `sftp_server_id` | Existing Transfer Family server ID. Required when `create_sftp_server` is `false`. | `string` | `null` | no |
 | `sftp_endpoint_type` | Transfer Family endpoint type — `PUBLIC` or `VPC`. | `string` | `"PUBLIC"` | no |
 | `sftp_vpc_id` | VPC ID for a VPC-type Transfer Family endpoint. | `string` | `null` | no |
 | `sftp_subnet_ids` | Subnet IDs for a VPC-type Transfer Family endpoint. | `list(string)` | `[]` | no |
+| `sftp_allowed_cidrs` | CIDR blocks allowed to access the SFTP server (VPC security group). Required for VPC endpoint type. | `list(string)` | `[]` | no |
 | `sftp_users` | SFTP users to provision. Each object has `username`, `ssh_public_key`, and optional `home_directory_prefix`. | `list(object)` | `[]` | no |
-| `staging_lifecycle_days` | Days before objects in the staging bucket expire. | `number` | `1` | no |
-| `clean_lifecycle_days` | Days before objects in the clean bucket transition to Infrequent Access. | `number` | `90` | no |
+| `enable_sftp_egress` | Whether to enable an egress SFTP endpoint for the egress bucket (read-only). | `bool` | `false` | no |
+| `create_sftp_egress_server` | Create a new Transfer Family server for egress. Set `false` to attach to an existing server. | `bool` | `true` | no |
+| `sftp_egress_server_id` | Existing Transfer Family server ID for egress. Required when `create_sftp_egress_server` is `false`. | `string` | `null` | no |
+| `sftp_egress_endpoint_type` | Transfer Family endpoint type for egress — `PUBLIC` or `VPC`. | `string` | `"PUBLIC"` | no |
+| `sftp_egress_vpc_id` | VPC ID for a VPC-type egress Transfer Family endpoint. | `string` | `null` | no |
+| `sftp_egress_subnet_ids` | Subnet IDs for a VPC-type egress Transfer Family endpoint. | `list(string)` | `[]` | no |
+| `sftp_egress_allowed_cidrs` | CIDR blocks allowed to access the egress SFTP server. | `list(string)` | `[]` | no |
+| `sftp_egress_users` | SFTP users for egress (read-only access to egress bucket). | `list(object)` | `[]` | no |
+| `ingress_lifecycle_days` | Days before objects in the ingress bucket expire. | `number` | `1` | no |
+| `egress_lifecycle_days` | Days before objects in the egress bucket transition to Infrequent Access. | `number` | `90` | no |
 | `quarantine_lifecycle_days` | Days before objects in the quarantine bucket expire. | `number` | `365` | no |
+| `lambda_runtime` | Lambda runtime identifier for the file-router function. | `string` | `"python3.12"` | no |
 | `lambda_memory_size` | Memory (MB) allocated to the file-router Lambda (128–10240). | `number` | `256` | no |
 | `lambda_timeout` | Timeout (seconds) for the file-router Lambda (1–900). | `number` | `60` | no |
 | `lambda_reserved_concurrency` | Reserved concurrent executions for the file-router Lambda. | `number` | `10` | no |
 | `sns_subscription_emails` | Email addresses subscribed to the malware-alert SNS topic. | `list(string)` | `[]` | no |
 | `enable_object_lock` | Enable S3 Object Lock on the quarantine bucket for tamper-proof retention. | `bool` | `false` | no |
+| `object_lock_retention_days` | Default retention period in days for Object Lock on the quarantine bucket. | `number` | `365` | no |
+| `object_lock_retention_mode` | Object Lock retention mode — `GOVERNANCE` or `COMPLIANCE`. | `string` | `"GOVERNANCE"` | no |
+| `create_log_bucket` | Whether to create a managed S3 access-log bucket. Set to `false` when shipping logs to an existing bucket via `log_bucket_name`. | `bool` | `true` | no |
+| `log_bucket_name` | Name of an existing S3 bucket for access-log shipping. Required when `create_log_bucket` is `false`. | `string` | `null` | no |
 | `log_retention_days` | CloudWatch Logs retention period in days. Must be a valid CloudWatch retention value. | `number` | `90` | no |
+| `s3_log_retention_days` | Number of days to retain S3 access logs in the log bucket. | `number` | `90` | no |
 
 ## Outputs
 
 | Name | Description |
 |---|---|
-| `staging_bucket_id` | Name of the staging (upload) S3 bucket. |
-| `staging_bucket_arn` | ARN of the staging (upload) S3 bucket. |
-| `clean_bucket_id` | Name of the clean (scan-passed) S3 bucket. |
-| `clean_bucket_arn` | ARN of the clean (scan-passed) S3 bucket. |
+| `ingress_bucket_id` | Name of the ingress (upload) S3 bucket. |
+| `ingress_bucket_arn` | ARN of the ingress (upload) S3 bucket. |
+| `egress_bucket_id` | Name of the egress (verified) S3 bucket. |
+| `egress_bucket_arn` | ARN of the egress (verified) S3 bucket. |
 | `quarantine_bucket_id` | Name of the quarantine (malware-detected) S3 bucket. |
 | `quarantine_bucket_arn` | ARN of the quarantine (malware-detected) S3 bucket. |
 | `log_bucket_id` | Name of the S3 access-log bucket. |
+| `log_bucket_arn` | ARN of the S3 access-log bucket. |
 | `kms_key_arn` | ARN of the KMS key used for encryption. |
 | `sftp_server_id` | ID of the AWS Transfer Family SFTP server (null if SFTP disabled). |
 | `sftp_server_endpoint` | Endpoint hostname of the SFTP server (null if SFTP disabled). |
+| `sftp_user_arns` | Map of ingress SFTP username to Transfer user ARN. |
+| `sftp_egress_server_id` | ID of the egress SFTP server (null if egress disabled). |
+| `sftp_egress_server_endpoint` | Endpoint hostname of the egress SFTP server (null if egress disabled). |
+| `sftp_egress_user_arns` | Map of egress SFTP username to Transfer user ARN. |
 | `sns_topic_arn` | ARN of the SNS topic for malware alert notifications. |
 | `guardduty_protection_plan_arn` | ARN of the GuardDuty Malware Protection plan. |
 | `lambda_function_arn` | ARN of the file-router Lambda function. |
+| `dlq_arn` | ARN of the file-router Lambda dead letter queue. |
+| `eventbridge_rule_arn` | ARN of the EventBridge rule for GuardDuty scan results. |
 
 ## Submodules
 
 | Module | Description |
 |---|---|
-| `modules/s3-buckets` | Creates the staging, clean, quarantine, and access-log S3 buckets with encryption, versioning, public access blocks, TLS-only policies, and lifecycle rules. |
-| `modules/guardduty-protection` | Configures a GuardDuty Malware Protection plan on the staging bucket with an IAM role for scanning. |
+| `modules/s3-buckets` | Creates the ingress, egress, quarantine, and access-log S3 buckets with encryption, versioning, public access blocks, TLS-only policies, and lifecycle rules. |
+| `modules/guardduty-protection` | Configures a GuardDuty Malware Protection plan on the ingress bucket with an IAM role for scanning. |
 | `modules/file-router` | Deploys the Lambda function, EventBridge rule, SNS topic, SQS DLQ, and IAM role that route files based on scan results. |
 | `modules/sftp` | Optionally provisions an AWS Transfer Family SFTP server (or attaches to an existing one), creates SFTP users with scoped IAM roles and SSH key authentication. |
 
 ## How It Works
 
-1. **Upload** — Files are uploaded to the staging bucket, either via direct S3 PutObject or through the optional SFTP endpoint (AWS Transfer Family).
+1. **Upload** — Files are uploaded to the ingress bucket, either via direct S3 PutObject or through the optional SFTP endpoint (AWS Transfer Family).
 
-2. **Scan** — GuardDuty Malware Protection for S3 automatically scans every new object in the staging bucket and tags it with the scan result.
+2. **Scan** — GuardDuty Malware Protection for S3 automatically scans every new object in the ingress bucket and tags it with the scan result.
 
 3. **Event** — When the scan completes, GuardDuty emits a `GuardDuty Malware Protection Object Scan Result` event to EventBridge.
 
 4. **Route** — An EventBridge rule invokes the file-router Lambda function with the scan result:
-   - **NO_THREATS_FOUND** — the file is copied to the clean bucket and deleted from staging.
-   - **THREATS_FOUND** — the file is copied to the quarantine bucket, deleted from staging, and an SNS notification is published with threat details.
-   - **Other results** (e.g., `UNSUPPORTED`, `ACCESS_DENIED`) — the file is left in staging for manual review.
+   - **NO_THREATS_FOUND** — the file is copied to the egress bucket and deleted from ingress.
+   - **THREATS_FOUND** — the file is copied to the quarantine bucket, deleted from ingress, and an SNS notification is published with threat details.
+   - **Other results** (e.g., `UNSUPPORTED`, `ACCESS_DENIED`) — the file is left in ingress for manual review.
 
 5. **Alert** — If threats are detected, subscribed email addresses receive a JSON-formatted alert with the file key, threat names, and timestamp.
+
+6. **Egress** (optional) — Verified files in the egress bucket can be pulled by downstream receivers via a read-only SFTP endpoint. Egress users have `GetObject` and `ListBucket` permissions only (no `PutObject`).
+
+## External KMS Key
+
+When using an externally managed KMS key (`create_kms_key = false`), your key policy must grant the following permissions to the AWS services used by this module:
+
+```json
+{
+  "Sid": "AllowSecureUploadServices",
+  "Effect": "Allow",
+  "Principal": {
+    "Service": [
+      "guardduty.amazonaws.com",
+      "lambda.amazonaws.com",
+      "s3.amazonaws.com",
+      "transfer.amazonaws.com",
+      "sns.amazonaws.com"
+    ]
+  },
+  "Action": [
+    "kms:Decrypt",
+    "kms:Encrypt",
+    "kms:GenerateDataKey*",
+    "kms:ReEncrypt*",
+    "kms:DescribeKey"
+  ],
+  "Resource": "*",
+  "Condition": {
+    "StringEquals": {
+      "aws:SourceAccount": "<YOUR_ACCOUNT_ID>"
+    }
+  }
+}
+```
+
+The module's IAM roles (Lambda, GuardDuty, Transfer Family users) also need `kms:Decrypt` and `kms:GenerateDataKey` grants on the key. These are handled automatically by the module's IAM policies — you only need to ensure the key policy allows the services listed above.
+
+## Cross-Account Log Shipping
+
+To ship S3 access logs to a centralized logging bucket (e.g., in a separate AWS account), set `create_log_bucket = false` and provide the bucket name:
+
+```hcl
+module "secure_upload" {
+  source = "path/to/terraform-secure-upload"
+
+  name_prefix       = "myapp"
+  create_log_bucket = false
+  log_bucket_name   = "central-logging-bucket"
+}
+```
+
+The external bucket must have a policy that allows S3 log delivery from the source account. Example bucket policy for the centralized logging bucket:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowS3LogDelivery",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "logging.s3.amazonaws.com"
+      },
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::central-logging-bucket/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:SourceAccount": "<SOURCE_ACCOUNT_ID>"
+        }
+      }
+    }
+  ]
+}
+```
+
+When using an external log bucket, the module does not manage the bucket's lifecycle, encryption, or access controls — the caller is responsible for those.
+
+The `log_bucket_arn` output will be `null` when using an external bucket (since the module does not own it).
 
 ## Known Limitations
 
 - **GuardDuty region availability** — GuardDuty Malware Protection for S3 is not available in all AWS regions. Check [AWS regional availability](https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_regions.html).
-- **Scan latency** — GuardDuty scans are asynchronous. Files remain in the staging bucket until the scan completes (typically seconds to minutes).
+- **Scan latency** — GuardDuty scans are asynchronous. Files remain in the ingress bucket until the scan completes (typically seconds to minutes).
 - **File size limits** — GuardDuty Malware Protection supports objects up to 5 GB. Larger files are not scanned.
 - **Object Lock requires bucket recreation** — Enabling `enable_object_lock` after the quarantine bucket already exists requires destroying and recreating the bucket (S3 limitation).
 - **SNS email confirmation** — Email subscriptions require manual confirmation by each recipient before alerts are delivered.
 - **SFTP users are service-managed** — This module uses Transfer Family's service-managed identity provider. Custom/external identity providers are not supported.
-- **Single staging bucket** — All SFTP users share the same staging bucket, isolated by home directory prefix.
+- **Single ingress bucket** — All SFTP users share the same ingress bucket, isolated by home directory prefix.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and pull request guidelines.
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for the vulnerability disclosure policy and an overview of the module's security design.
 
 ## License
 
-Apache 2.0 — see [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE) for details.
