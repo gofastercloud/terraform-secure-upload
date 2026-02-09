@@ -1,0 +1,38 @@
+name_prefix = "myapp-prod"
+region      = "us-east-1"
+
+# kms_key_arn = "arn:aws:kms:us-east-1:123456789012:key/abcd-1234-efgh-5678"
+
+staging_lifecycle_days    = 1
+clean_lifecycle_days      = 90
+quarantine_lifecycle_days = 365
+enable_object_lock        = true
+
+lambda_memory_size          = 512
+lambda_timeout              = 120
+lambda_reserved_concurrency = 20
+
+sns_subscription_emails = ["security@example.com", "ops@example.com"]
+
+log_retention_days = 180
+
+vpc_id     = "vpc-0abc123def456"
+subnet_ids = ["subnet-aaa111", "subnet-bbb222"]
+
+sftp_users = [
+  {
+    username              = "partner-a"
+    ssh_public_key        = "ssh-ed25519 AAAA... partner-a@example.com"
+    home_directory_prefix = "/uploads/partner-a/"
+  },
+  {
+    username              = "partner-b"
+    ssh_public_key        = "ssh-ed25519 AAAA... partner-b@example.com"
+    home_directory_prefix = "/uploads/partner-b/"
+  },
+]
+
+tags = {
+  Environment = "production"
+  Team        = "security"
+}

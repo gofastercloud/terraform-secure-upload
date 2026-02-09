@@ -1,0 +1,2 @@
+name_prefix = "myapp-dev"
+region      = "us-east-1"
