@@ -75,6 +75,7 @@ A Terraform module that creates a secure file upload pipeline on AWS with automa
 - **Lambda error alarm** — CloudWatch alarm on Lambda invocation errors (separate from DLQ), firing to the SNS alert topic
 - **CloudWatch dashboard** — optional pipeline dashboard with metric filters for file routing outcomes, Lambda health, DLQ depth, and S3 bucket metrics
 - **Deletion protection** — `prevent_destroy` lifecycle on the KMS key and quarantine bucket to guard against accidental data loss
+- **Chat & incident integrations** — optional integrations for Slack, Microsoft Teams, PagerDuty, VictorOps, Discord, and ServiceNow (see [integrations.md](integrations.md))
 
 ## Prerequisites
 

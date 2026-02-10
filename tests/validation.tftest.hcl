@@ -646,3 +646,181 @@ run "dashboard_disabled_by_default" {
     error_message = "Dashboard ARN should be null when enable_cloudwatch_dashboard is false"
   }
 }
+
+################################################################################
+# Integration variable validation tests
+################################################################################
+
+run "slack_missing_workspace_id" {
+  command = plan
+
+  variables {
+    name_prefix              = "test-val"
+    enable_sftp_ingress      = false
+    enable_slack_integration = true
+    slack_workspace_id       = null
+    slack_channel_id         = "C0XXXXXXXXX"
+  }
+
+  expect_failures = [
+    var.slack_workspace_id,
+  ]
+}
+
+run "slack_missing_channel_id" {
+  command = plan
+
+  variables {
+    name_prefix              = "test-val"
+    enable_sftp_ingress      = false
+    enable_slack_integration = true
+    slack_workspace_id       = "T0XXXXXXXXX"
+    slack_channel_id         = null
+  }
+
+  expect_failures = [
+    var.slack_channel_id,
+  ]
+}
+
+run "teams_missing_tenant_id" {
+  command = plan
+
+  variables {
+    name_prefix              = "test-val"
+    enable_sftp_ingress      = false
+    enable_teams_integration = true
+    teams_tenant_id          = null
+    teams_team_id            = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+    teams_channel_id         = "19:xxx@thread.tacv2"
+  }
+
+  expect_failures = [
+    var.teams_tenant_id,
+  ]
+}
+
+run "teams_missing_team_id" {
+  command = plan
+
+  variables {
+    name_prefix              = "test-val"
+    enable_sftp_ingress      = false
+    enable_teams_integration = true
+    teams_tenant_id          = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+    teams_team_id            = null
+    teams_channel_id         = "19:xxx@thread.tacv2"
+  }
+
+  expect_failures = [
+    var.teams_team_id,
+  ]
+}
+
+run "teams_missing_channel_id" {
+  command = plan
+
+  variables {
+    name_prefix              = "test-val"
+    enable_sftp_ingress      = false
+    enable_teams_integration = true
+    teams_tenant_id          = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+    teams_team_id            = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+    teams_channel_id         = null
+  }
+
+  expect_failures = [
+    var.teams_channel_id,
+  ]
+}
+
+run "pagerduty_invalid_url" {
+  command = plan
+
+  variables {
+    name_prefix               = "test-val"
+    enable_sftp_ingress       = false
+    pagerduty_integration_url = "https://example.com/not-pagerduty"
+  }
+
+  expect_failures = [
+    var.pagerduty_integration_url,
+  ]
+}
+
+run "victorops_invalid_url" {
+  command = plan
+
+  variables {
+    name_prefix               = "test-val"
+    enable_sftp_ingress       = false
+    victorops_integration_url = "https://example.com/not-victorops"
+  }
+
+  expect_failures = [
+    var.victorops_integration_url,
+  ]
+}
+
+run "discord_missing_webhook_url" {
+  command = plan
+
+  variables {
+    name_prefix                = "test-val"
+    enable_sftp_ingress        = false
+    enable_discord_integration = true
+    discord_webhook_url        = null
+  }
+
+  expect_failures = [
+    var.discord_webhook_url,
+  ]
+}
+
+run "servicenow_missing_instance_url" {
+  command = plan
+
+  variables {
+    name_prefix                       = "test-val"
+    enable_sftp_ingress               = false
+    enable_servicenow_integration     = true
+    servicenow_instance_url           = null
+    servicenow_credentials_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-AbCdEf"
+  }
+
+  expect_failures = [
+    var.servicenow_instance_url,
+  ]
+}
+
+run "servicenow_missing_credentials_arn" {
+  command = plan
+
+  variables {
+    name_prefix                       = "test-val"
+    enable_sftp_ingress               = false
+    enable_servicenow_integration     = true
+    servicenow_instance_url           = "https://mycompany.service-now.com"
+    servicenow_credentials_secret_arn = null
+  }
+
+  expect_failures = [
+    var.servicenow_credentials_secret_arn,
+  ]
+}
+
+run "servicenow_invalid_credentials_arn" {
+  command = plan
+
+  variables {
+    name_prefix                       = "test-val"
+    enable_sftp_ingress               = false
+    enable_servicenow_integration     = true
+    servicenow_instance_url           = "https://mycompany.service-now.com"
+    servicenow_credentials_secret_arn = "arn:aws:s3:::not-a-secret"
+  }
+
+  expect_failures = [
+    var.servicenow_credentials_secret_arn,
+  ]
+}
