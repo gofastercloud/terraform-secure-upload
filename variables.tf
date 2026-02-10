@@ -342,6 +342,14 @@ variable "sns_subscription_emails" {
   description = "Email addresses subscribed to the malware-alert SNS topic."
   type        = list(string)
   default     = []
+
+  validation {
+    condition = alltrue([
+      for email in var.sns_subscription_emails :
+      can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", email))
+    ])
+    error_message = "Each sns_subscription_emails entry must be a valid email address (e.g. user@example.com)."
+  }
 }
 
 ################################################################################

@@ -62,10 +62,11 @@ terraform-secure-upload/
 │   ├── complete/        # Full config with SFTP, custom KMS, VPC
 │   └── existing-sftp/   # Using existing Transfer Family server
 ├── tests/               # Terraform native tests (.tftest.hcl)
-│   ├── validation.tftest.hcl   # Variable validation tests (runs in CI, no AWS creds)
-│   ├── basic.tftest.hcl        # Plan-level module instantiation tests
-│   ├── sftp.tftest.hcl         # SFTP module plan-level tests
-│   └── s3_security.tftest.hcl  # S3 bucket security configuration tests
+│   ├── validation.tftest.hcl      # Variable validation tests (runs in CI, no AWS creds)
+│   ├── basic.tftest.hcl           # Plan-level module instantiation tests
+│   ├── sftp.tftest.hcl            # SFTP ingress module plan-level tests
+│   ├── sftp-egress.tftest.hcl     # SFTP egress module plan-level tests
+│   └── s3_security.tftest.hcl     # S3 bucket security configuration tests
 └── test/                # Terratest (Go) — integration tests
 ```
 
@@ -102,6 +103,16 @@ terraform-secure-upload/
 8. **Docker-based local dev**: A `Makefile` wraps all checks (`fmt`, `validate`, `test`)
    in a Docker container pinned to the same Terraform version as CI, avoiding version
    mismatch issues.
+
+9. **Deletion protection**: The KMS key and quarantine bucket have `prevent_destroy`
+   lifecycle rules. These are critical resources — deleting the KMS key renders all
+   encrypted data unrecoverable, and deleting the quarantine bucket destroys forensic
+   evidence. The lifecycle rules must be removed from source before these resources
+   can be destroyed.
+
+10. **SFTP namespace isolation**: The ingress SFTP module uses `${name_prefix}-ingress`
+    and the egress module uses `${name_prefix}-egress` to prevent Transfer Family
+    resource name collisions when both are enabled simultaneously.
 
 ## External Dependencies and Caller Responsibilities
 
