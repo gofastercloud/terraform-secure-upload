@@ -16,12 +16,15 @@ logger.setLevel(logging.INFO)
 
 s3 = boto3.client("s3")
 sns = boto3.client("sns")
+lambda_client = boto3.client("lambda")
 
 INGRESS_BUCKET = os.environ["INGRESS_BUCKET"]
 EGRESS_BUCKET = os.environ["EGRESS_BUCKET"]
 QUARANTINE_BUCKET = os.environ["QUARANTINE_BUCKET"]
 SNS_TOPIC_ARN = os.environ["SNS_TOPIC_ARN"]
 KMS_KEY_ARN = os.environ["KMS_KEY_ARN"]
+SCANNER_FUNCTION_NAME = os.environ.get("SCANNER_FUNCTION_NAME")
+PROMPT_INJECTION_THRESHOLD = int(os.environ.get("PROMPT_INJECTION_THRESHOLD", "0"))
 
 
 def handler(event, context):
@@ -71,6 +74,22 @@ def handler(event, context):
     )
 
     if scan_result_status == "NO_THREATS_FOUND":
+        if SCANNER_FUNCTION_NAME:
+            score, scannable = _check_prompt_injection(source_bucket, object_key)
+            if scannable and score > PROMPT_INJECTION_THRESHOLD:
+                logger.info(
+                    "Prompt injection detected: score=%s, threshold=%s, s3://%s/%s",
+                    score,
+                    PROMPT_INJECTION_THRESHOLD,
+                    source_bucket,
+                    object_key,
+                )
+                return _route_quarantine(
+                    source_bucket,
+                    object_key,
+                    "PROMPT_INJECTION_DETECTED",
+                    [{"name": "PromptInjection", "score": score}],
+                )
         return _route_egress(source_bucket, object_key)
     elif scan_result_status == "THREATS_FOUND":
         threats = scan_result_details.get("threats") or []
@@ -87,6 +106,32 @@ def handler(event, context):
             "statusCode": 200,
             "body": f"Scan result '{scan_result_status}', file left for manual review.",
         }
+
+
+def _check_prompt_injection(bucket, key):
+    """Invoke the prompt injection scanner Lambda synchronously and return (score, scannable)."""
+    response = lambda_client.invoke(
+        FunctionName=SCANNER_FUNCTION_NAME,
+        InvocationType="RequestResponse",
+        Payload=json.dumps({"bucket": bucket, "key": key}),
+    )
+    payload = json.loads(response["Payload"].read())
+
+    # Handle Lambda errors (function error vs execution error)
+    if "FunctionError" in response:
+        logger.error("Scanner Lambda returned error: %s", payload)
+        raise RuntimeError(f"Prompt injection scanner failed: {payload}")
+
+    score = payload.get("score", 0)
+    scannable = payload.get("scannable", False)
+    logger.info(
+        "Prompt injection scan result for s3://%s/%s: score=%s, scannable=%s",
+        bucket,
+        key,
+        score,
+        scannable,
+    )
+    return score, scannable
 
 
 def _object_exists(bucket, key):

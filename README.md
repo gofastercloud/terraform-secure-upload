@@ -42,11 +42,28 @@ A Terraform module that creates a secure file upload pipeline on AWS with automa
                       │  Lambda File Router  │──────┐
                       └──────┬──────────────┘      │
                              │                      │
-              ┌──────────────┴──────────┐           │
-              ▼                         ▼           ▼
+                    (NO_THREATS_FOUND)               │
+                             │                      │
+                    [scanning enabled?]              │
+                     │              │                │
+                    YES             NO               │
+                     │              │                │
+              ┌──────┴──────┐       │               │
+              │  Prompt     │       │               │
+              │  Injection  │       │               │
+              │  Scanner    │       │               │
+              └──────┬──────┘       │               │
+                     │              │               │
+              [score > threshold?]  │               │
+               │            │       │               │
+              YES           NO      │               │
+               │            │       │               │
+               │     ┌──────┴───────┘               │
+               │     │                              │
+               ▼     ▼                              ▼
    ┌───────────────────┐   ┌───────────────────┐  ┌──────────┐
    │  Egress Bucket    │   │Quarantine Bucket   │  │   SNS    │
-   │   (verified)      │   │(malware detected)  │  │  Alert   │
+   │   (verified)      │   │(threats/injection) │  │  Alert   │
    └────────┬──────────┘   └───────────────────┘  └──────────┘
             │
             ▼ (optional)
@@ -59,6 +76,7 @@ A Terraform module that creates a secure file upload pipeline on AWS with automa
 
 ## Features
 
+- **Prompt injection scanning** — optional AI-powered scanning of uploaded documents for prompt injection attacks using an ONNX model, with configurable score threshold and support for PDF, DOCX, PPTX, and plain text formats
 - **Automatic malware scanning** — GuardDuty Malware Protection scans every object uploaded to the ingress bucket
 - **Automated file routing** — Lambda moves verified files to the egress bucket and infected files to quarantine
 - **SNS alerting** — email notifications when malware is detected
@@ -226,6 +244,17 @@ module "secure_upload" {
 | `lambda_timeout` | Timeout (seconds) for the file-router Lambda (1–900). | `number` | `60` | no |
 | `lambda_reserved_concurrency` | Reserved concurrent executions for the file-router Lambda. Set to `-1` to use unreserved account concurrency. | `number` | `10` | no |
 
+### Prompt Injection Scanning
+
+| Name | Description | Type | Default | Required |
+|---|---|---|---|---|
+| `enable_prompt_injection_scanning` | Enable prompt injection scanning of uploaded documents. When true, files that pass malware scanning are additionally scanned before reaching egress. | `bool` | `false` | no |
+| `prompt_injection_threshold` | Score threshold (0–100) above which a file is quarantined for prompt injection. | `number` | `80` | no |
+| `prompt_injection_memory_size` | Memory (MB) for the scanner Lambda (512–10240). Higher memory allocates more CPU, speeding up ONNX model loading. 3008 MB recommended. | `number` | `3008` | no |
+| `prompt_injection_timeout` | Timeout (seconds) for the scanner Lambda (1–900). | `number` | `120` | no |
+| `prompt_injection_reserved_concurrency` | Reserved concurrent executions for the scanner Lambda. Set to `-1` for unreserved. | `number` | `5` | no |
+| `prompt_injection_image_uri` | URI of a pre-built container image for the scanner. When set, skips ECR repo creation and image build. | `string` | `null` | no |
+
 ### Notifications
 
 | Name | Description | Type | Default | Required |
@@ -280,6 +309,8 @@ module "secure_upload" {
 | `dlq_arn` | ARN of the file-router Lambda dead letter queue. |
 | `eventbridge_rule_arn` | ARN of the EventBridge rule for GuardDuty scan results. |
 | `cloudwatch_dashboard_arn` | ARN of the CloudWatch pipeline dashboard (null when disabled). |
+| `prompt_injection_scanner_function_arn` | ARN of the prompt injection scanner Lambda function (null when disabled). |
+| `prompt_injection_scanner_ecr_repository_url` | URL of the ECR repository for the scanner image (null when disabled or BYO image). |
 
 ## Submodules
 
@@ -299,7 +330,7 @@ module "secure_upload" {
 3. **Event** — When the scan completes, GuardDuty emits a `GuardDuty Malware Protection Object Scan Result` event to EventBridge.
 
 4. **Route** — An EventBridge rule invokes the file-router Lambda function with the scan result:
-   - **NO_THREATS_FOUND** — the file is copied to the egress bucket and deleted from ingress.
+   - **NO_THREATS_FOUND** — if prompt injection scanning is enabled, the file router invokes the scanner Lambda synchronously. If the score exceeds the threshold, the file is quarantined. Otherwise (or if scanning is disabled), the file is copied to the egress bucket and deleted from ingress.
    - **THREATS_FOUND** — the file is copied to the quarantine bucket, deleted from ingress, and an SNS notification is published with threat details.
    - **Other results** (e.g., `UNSUPPORTED`, `ACCESS_DENIED`) — the file is left in ingress for manual review.
 
@@ -368,6 +399,30 @@ When using an externally managed KMS key (`create_kms_key = false`), your key po
 
 The module's IAM roles (Lambda, GuardDuty, Transfer Family users) also need `kms:Decrypt` and `kms:GenerateDataKey` grants on the key. These are handled automatically by the module's IAM policies — you only need to ensure the key policy allows the services listed above.
 
+**Prompt injection scanning**: When `enable_prompt_injection_scanning` is `true` and a BYO image is not provided (`prompt_injection_image_uri` is `null`), the module creates an ECR repository encrypted with the same KMS key. ECR requires `kms:CreateGrant` on the key — the principal running Terraform must have this permission in the key policy. For module-managed keys this is already covered by the `AllowAccountManagement` statement. For external keys, add the following to your key policy:
+
+```json
+{
+  "Sid": "AllowECRGrants",
+  "Effect": "Allow",
+  "Principal": {
+    "AWS": "arn:aws:iam::<YOUR_ACCOUNT_ID>:root"
+  },
+  "Action": [
+    "kms:CreateGrant",
+    "kms:DescribeKey"
+  ],
+  "Resource": "*",
+  "Condition": {
+    "Bool": {
+      "kms:GrantIsForAWSResource": "true"
+    }
+  }
+}
+```
+
+This scoped condition ensures grants can only be created for AWS services (ECR), not arbitrary principals. Alternatively, if you provide a pre-built image via `prompt_injection_image_uri`, no ECR repository is created and this grant is not needed.
+
 ## Cross-Account Log Shipping
 
 To ship S3 access logs to a centralized logging bucket (e.g., in a separate AWS account), set `create_log_bucket = false` and provide the bucket name:
@@ -416,9 +471,8 @@ Depending on your configuration, you may need to make changes **outside this mod
 
 | Scenario | External Action Required |
 |---|---|
-| **SFTP enabled** with org service allowlist SCP | Add Transfer Family actions to the SCP `NotAction` list: `transfer:CreateServer`, `transfer:DescribeServer`, `transfer:UpdateServer`, `transfer:DeleteServer`, `transfer:CreateUser`, `transfer:DescribeUser`, `transfer:UpdateUser`, `transfer:DeleteUser`, `transfer:ImportSshPublicKey`, `transfer:DeleteSshPublicKey`, `transfer:TagResource`, `transfer:UntagResource`, `transfer:ListServers`, `transfer:ListUsers`, `transfer:ListTagsForResource`. |
-| **VPC-type SFTP endpoint** with org service allowlist SCP | Also add EC2 actions for security groups and ENIs to the SCP `NotAction` list: `ec2:CreateSecurityGroup`, `ec2:DeleteSecurityGroup`, `ec2:DescribeSecurityGroups`, `ec2:DescribeSecurityGroupRules`, `ec2:AuthorizeSecurityGroupIngress`, `ec2:AuthorizeSecurityGroupEgress`, `ec2:RevokeSecurityGroupIngress`, `ec2:RevokeSecurityGroupEgress`, `ec2:DescribeVpcs`, `ec2:DescribeSubnets`, `ec2:DescribeNetworkInterfaces`, `ec2:CreateNetworkInterface`, `ec2:DeleteNetworkInterface`, `ec2:ModifyNetworkInterfaceAttribute`, `ec2:CreateTags`, `ec2:DeleteTags`. |
 | **External KMS key** (`create_kms_key = false`) | Update the KMS key policy to grant service principals access. See [External KMS Key](#external-kms-key) above. |
+| **External KMS key + prompt injection scanning** | Additionally grant `kms:CreateGrant` for ECR repository encryption. See the prompt injection note under [External KMS Key](#external-kms-key). Not needed when providing a pre-built image via `prompt_injection_image_uri`. |
 | **Cross-account KMS key** | Add cross-account grants for the module's IAM roles (output as `lambda_role_arn`, `guardduty_role_arn`, etc.). |
 | **External log bucket** (`create_log_bucket = false`) | Configure the bucket policy, encryption, and lifecycle. See [Cross-Account Log Shipping](#cross-account-log-shipping) above. |
 | **Existing SFTP server** (`create_sftp_ingress_server = false`) | Ensure the server uses `SERVICE_MANAGED` identity and the `SFTP` protocol. |
@@ -436,7 +490,6 @@ For a comprehensive security checklist for external resources, see [SECURITY.md]
 - **SNS email confirmation** — Email subscriptions require manual confirmation by each recipient before alerts are delivered.
 - **SFTP users are service-managed** — This module uses Transfer Family's service-managed identity provider. Custom/external identity providers are not supported.
 - **Single ingress bucket** — All SFTP users share the same ingress bucket, isolated by home directory prefix.
-- **Organization SCPs** — If your AWS Organization uses a service allowlist SCP, specific Transfer Family actions must be added to deploy SFTP resources. VPC-type endpoints additionally require EC2 actions for security groups and ENIs. See [External Changes Required](#external-changes-required) for the full list.
 
 ## Upgrading to v0.2.1
 

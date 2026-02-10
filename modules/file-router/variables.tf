@@ -91,3 +91,15 @@ variable "enable_cloudwatch_dashboard" {
   type        = bool
   default     = false
 }
+
+variable "prompt_injection_scanner_function_arn" {
+  description = "ARN of the prompt injection scanner Lambda function. When non-null, the file router invokes it synchronously for files that pass malware scanning."
+  type        = string
+  default     = null
+}
+
+variable "prompt_injection_threshold" {
+  description = "Score threshold (0–100) above which a file is quarantined for prompt injection."
+  type        = number
+  default     = 80
+}

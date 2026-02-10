@@ -68,11 +68,6 @@ When attaching to a pre-existing SFTP server (`create_sftp_ingress_server = fals
 - For VPC-type servers, ensure security groups restrict inbound access to known CIDR ranges.
 - Review the server's security policy — the module does not set the TLS policy on existing servers.
 
-### Organization-Level Controls
-
-- **SCP allowlist** — If your AWS Organization uses a service allowlist SCP, `"transfer:*"` must be added before deploying SFTP functionality. See `plans/scp-change-request-transfer-family.md` for a detailed analysis and change request template.
-- **Data perimeter RCPs** — Verify that any Resource Control Policies allow the AWS service principals used by this module (GuardDuty, Lambda, EventBridge, Transfer Family, S3 log delivery). These are typically exempted via `aws:PrincipalIsAWSService` conditions.
-
 ### Network Security (VPC Endpoints)
 
 When using VPC-type SFTP endpoints:

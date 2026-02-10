@@ -170,67 +170,77 @@ resource "aws_iam_role_policy" "file_router" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "IngressBucketRead"
-        Effect = "Allow"
-        Action = [
-          "s3:GetObject",
-          "s3:GetObjectTagging",
-          "s3:HeadObject",
-          "s3:DeleteObject",
-        ]
-        Resource = "${var.ingress_bucket_arn}/*"
-      },
-      {
-        Sid    = "EgressBucketWrite"
-        Effect = "Allow"
-        Action = [
-          "s3:PutObject",
-          "s3:PutObjectTagging",
-        ]
-        Resource = "${var.egress_bucket_arn}/*"
-      },
-      {
-        Sid    = "QuarantineBucketWrite"
-        Effect = "Allow"
-        Action = [
-          "s3:PutObject",
-          "s3:PutObjectTagging",
-        ]
-        Resource = "${var.quarantine_bucket_arn}/*"
-      },
-      {
-        Sid      = "SNSPublish"
-        Effect   = "Allow"
-        Action   = "sns:Publish"
-        Resource = aws_sns_topic.malware_alerts.arn
-      },
-      {
-        Sid      = "DLQSend"
-        Effect   = "Allow"
-        Action   = "sqs:SendMessage"
-        Resource = aws_sqs_queue.dlq.arn
-      },
-      {
-        Sid    = "KMSAccess"
-        Effect = "Allow"
-        Action = [
-          "kms:Decrypt",
-          "kms:GenerateDataKey",
-        ]
-        Resource = var.kms_key_arn
-      },
-      {
-        Sid    = "CloudWatchLogs"
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-        ]
-        Resource = "${aws_cloudwatch_log_group.file_router.arn}:*"
-      },
-    ]
+    Statement = concat(
+      [
+        {
+          Sid    = "IngressBucketRead"
+          Effect = "Allow"
+          Action = [
+            "s3:GetObject",
+            "s3:GetObjectTagging",
+            "s3:HeadObject",
+            "s3:DeleteObject",
+          ]
+          Resource = "${var.ingress_bucket_arn}/*"
+        },
+        {
+          Sid    = "EgressBucketWrite"
+          Effect = "Allow"
+          Action = [
+            "s3:PutObject",
+            "s3:PutObjectTagging",
+          ]
+          Resource = "${var.egress_bucket_arn}/*"
+        },
+        {
+          Sid    = "QuarantineBucketWrite"
+          Effect = "Allow"
+          Action = [
+            "s3:PutObject",
+            "s3:PutObjectTagging",
+          ]
+          Resource = "${var.quarantine_bucket_arn}/*"
+        },
+        {
+          Sid      = "SNSPublish"
+          Effect   = "Allow"
+          Action   = "sns:Publish"
+          Resource = aws_sns_topic.malware_alerts.arn
+        },
+        {
+          Sid      = "DLQSend"
+          Effect   = "Allow"
+          Action   = "sqs:SendMessage"
+          Resource = aws_sqs_queue.dlq.arn
+        },
+        {
+          Sid    = "KMSAccess"
+          Effect = "Allow"
+          Action = [
+            "kms:Decrypt",
+            "kms:GenerateDataKey",
+          ]
+          Resource = var.kms_key_arn
+        },
+        {
+          Sid    = "CloudWatchLogs"
+          Effect = "Allow"
+          Action = [
+            "logs:CreateLogStream",
+            "logs:PutLogEvents",
+          ]
+          Resource = "${aws_cloudwatch_log_group.file_router.arn}:*"
+        },
+      ],
+      var.prompt_injection_scanner_function_arn != null ? [
+        {
+          Sid      = "InvokeScannerLambda"
+          Effect   = "Allow"
+          Action   = "lambda:InvokeFunction"
+          Resource = var.prompt_injection_scanner_function_arn
+        },
+      ] : [],
+    )
   })
 }
 
@@ -258,13 +268,19 @@ resource "aws_lambda_function" "file_router" {
   kms_key_arn = var.kms_key_arn
 
   environment {
-    variables = {
-      INGRESS_BUCKET    = var.ingress_bucket_name
-      EGRESS_BUCKET     = var.egress_bucket_name
-      QUARANTINE_BUCKET = var.quarantine_bucket_name
-      SNS_TOPIC_ARN     = aws_sns_topic.malware_alerts.arn
-      KMS_KEY_ARN       = var.kms_key_arn
-    }
+    variables = merge(
+      {
+        INGRESS_BUCKET    = var.ingress_bucket_name
+        EGRESS_BUCKET     = var.egress_bucket_name
+        QUARANTINE_BUCKET = var.quarantine_bucket_name
+        SNS_TOPIC_ARN     = aws_sns_topic.malware_alerts.arn
+        KMS_KEY_ARN       = var.kms_key_arn
+      },
+      var.prompt_injection_scanner_function_arn != null ? {
+        SCANNER_FUNCTION_NAME      = regex("function:(.+)$", var.prompt_injection_scanner_function_arn)[0]
+        PROMPT_INJECTION_THRESHOLD = tostring(var.prompt_injection_threshold)
+      } : {},
+    )
   }
 
   depends_on = [

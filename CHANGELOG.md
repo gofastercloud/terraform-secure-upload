@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2026-02-10
+
+### Added
+
+- **Prompt injection scanning** — optional second scanning step that runs an ONNX-based prompt injection detection model ([protectai/deberta-v3-base-prompt-injection-v2](https://huggingface.co/protectai/deberta-v3-base-prompt-injection-v2)) on uploaded documents before they reach the egress bucket. Files that pass GuardDuty malware scanning are additionally checked for prompt injection attacks when `enable_prompt_injection_scanning = true`.
+- **Supported document formats** — scanner extracts text from `.txt`, `.csv`, `.md`, `.json`, `.xml`, `.html`, `.yaml`, `.yml`, `.log`, `.pdf`, `.docx`, and `.pptx` files. Unsupported formats (images, binaries, etc.) pass through with score 0.
+- **Configurable threshold** — `prompt_injection_threshold` (default: 80) sets the score above which files are quarantined. Model outputs a 0–100 score based on the maximum injection probability across overlapping 512-token chunks.
+- **Container image Lambda** — scanner runs as a Docker-based Lambda with ECR repository, automatic image build via `null_resource`, and BYO image support via `prompt_injection_image_uri`.
+- **New variables** — `enable_prompt_injection_scanning`, `prompt_injection_threshold`, `prompt_injection_memory_size`, `prompt_injection_timeout`, `prompt_injection_reserved_concurrency`, `prompt_injection_image_uri`.
+- **New outputs** — `prompt_injection_scanner_function_arn`, `prompt_injection_scanner_ecr_repository_url`.
+- **Makefile targets** — `make build-scanner` and `make push-scanner` for local Docker image management.
+- **Validation tests** — 7 new tests for prompt injection variable validation rules.
+
 ## [0.4.0] - 2026-02-10
 
 ### Added

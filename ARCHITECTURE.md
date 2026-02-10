@@ -2,9 +2,10 @@
 
 ## Overview
 
-This Terraform module provides a secure file upload pipeline with automated malware scanning.
-Files uploaded via S3 API or SFTP are scanned by GuardDuty Malware Protection, then routed
-to egress or quarantine buckets based on scan results.
+This Terraform module provides a secure file upload pipeline with automated malware scanning
+and optional prompt injection detection. Files uploaded via S3 API or SFTP are scanned by
+GuardDuty Malware Protection, then optionally scanned for prompt injection attacks using an
+ONNX model, before being routed to egress or quarantine buckets based on scan results.
 
 ## Flow
 
@@ -27,17 +28,33 @@ to egress or quarantine buckets based on scan results.
                                         └───┬────────┬───┘
                                             │        │
                                    Clean    │        │  Malware
-                                            ▼        ▼
-                                  ┌──────────┐  ┌──────────────┐
-                                  │  Egress  │  │  Quarantine  │
-                                  │  Bucket  │  │    Bucket    │
-                                  └────┬─────┘  └──────┬───────┘
-                                       │               │
-                                       ▼               ▼
-                              ┌─────────────┐   ┌──────────────┐
-                              │ SFTP Egress │   │  SNS Alert   │
-                              │ (read-only) │   │    Topic     │
-                              └─────────────┘   └──────────────┘
+                                            │        ▼
+                                            │   ┌──────────────┐
+                                  [scanning │   │  Quarantine  │
+                                   enabled?]│   │    Bucket    │
+                                     │      │   └──────┬───────┘
+                                    YES     │          │
+                                     │     NO          ▼
+                                     ▼      │   ┌──────────────┐
+                              ┌──────────┐  │   │  SNS Alert   │
+                              │  Prompt  │  │   │    Topic     │
+                              │ Injection│  │   └──────────────┘
+                              │ Scanner  │  │
+                              └──┬───┬───┘  │
+                          Safe   │   │ Risky│
+                                 │   │      │
+                                 │   └──────┤
+                                 ▼          │
+                              ┌──────────┐  │
+                              │  Egress  │  │
+                              │  Bucket  │  │
+                              └────┬─────┘  │
+                                   │        │
+                                   ▼        ▼
+                          ┌─────────────┐  (Quarantine
+                          │ SFTP Egress │   + SNS Alert)
+                          │ (read-only) │
+                          └─────────────┘
 ```
 
 ## Module Structure
@@ -55,8 +72,15 @@ terraform-secure-upload/
 │   ├── guardduty-protection/  # GuardDuty Malware Protection plan + IAM
 │   ├── file-router/     # Lambda + EventBridge + SNS + SQS DLQ
 │   └── sftp/            # Transfer Family server + users (used by both ingress and egress)
+├── prompt-injection.tf  # ECR repo, scanner Lambda, IAM (gated on enable flag)
+├── prompt-injection-variables.tf  # Scanner configuration variables
 ├── lambda/
 │   └── file_router.py   # Lambda function source code
+├── functions/
+│   └── prompt_injection_scanner/  # Container-image Lambda
+│       ├── Dockerfile             # Python 3.12 + ONNX model + doc parsing libs
+│       ├── handler.py             # Download, extract text, run ONNX inference
+│       └── requirements.txt       # onnxruntime, transformers, PyPDF2, etc.
 ├── examples/
 │   ├── basic/           # S3-only upload, minimal config
 │   ├── complete/        # Full config with SFTP, custom KMS, VPC
@@ -114,7 +138,16 @@ terraform-secure-upload/
     and the egress module uses `${name_prefix}-egress` to prevent Transfer Family
     resource name collisions when both are enabled simultaneously.
 
-11. **CloudWatch dashboard**: Optional observability layer gated behind
+11. **Prompt injection scanning**: Optional second scanning step gated behind
+    `enable_prompt_injection_scanning`. The file router invokes a container-image
+    Lambda synchronously (`InvocationType: RequestResponse`) for files that pass
+    GuardDuty. The scanner runs the `protectai/deberta-v3-base-prompt-injection-v2`
+    ONNX model (184M params, Apache 2.0) to score text content. Non-text files
+    (images, binaries) get score 0 and pass through. The file router timeout
+    auto-bumps to `scanner_timeout + 30s` when scanning is enabled. The scanner
+    image is ~1.6GB; cold starts benefit from higher memory (more CPU).
+
+12. **CloudWatch dashboard**: Optional observability layer gated behind
     `enable_cloudwatch_dashboard`. Uses CloudWatch metric filters on the existing
     Lambda log group to derive file routing metrics (egress, quarantine, review,
     skipped) without any Lambda code changes. The dashboard combines custom metrics
@@ -123,12 +156,6 @@ terraform-secure-upload/
 ## External Dependencies and Caller Responsibilities
 
 This module is largely self-contained, but several configurations require the caller to manage resources or policies outside the module:
-
-### SCP / Organization Policy Changes
-
-If your AWS Organization uses a service allowlist SCP (Deny with `NotAction` pattern), you must ensure `"transfer:*"` is in the allowed list before deploying SFTP functionality. The base pipeline (S3, Lambda, GuardDuty, KMS, EventBridge, SQS, SNS, CloudWatch) uses only commonly-allowed services and is unlikely to be blocked.
-
-See `plans/scp-change-request-transfer-family.md` for a detailed change request template.
 
 ### External KMS Key (`create_kms_key = false`)
 
@@ -160,7 +187,7 @@ When using VPC-type SFTP endpoints:
 
 - **VPC and subnets** — Must exist before module deployment. The module does not create networking infrastructure.
 - **Security groups** — The module creates a security group with ingress from `sftp_ingress_allowed_cidrs`. The caller must ensure the VPC has appropriate routing (NAT gateway, VPC endpoints, or internet gateway as needed).
-- **EC2 SCP permissions** — VPC-type endpoints require `ec2:*` in service allowlist SCPs (for security group and ENI operations). This is separate from the `transfer:*` requirement.
+- **EC2 permissions** — VPC-type endpoints require EC2 permissions for security group and ENI operations (e.g. `ec2:CreateSecurityGroup`, `ec2:CreateNetworkInterface`).
 
 ### GuardDuty
 
