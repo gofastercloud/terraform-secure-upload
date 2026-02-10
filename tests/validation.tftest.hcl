@@ -293,3 +293,118 @@ run "lambda_concurrency_zero" {
     var.lambda_reserved_concurrency,
   ]
 }
+
+################################################################################
+# Test: sftp_users bare "/" home_directory_prefix fails
+################################################################################
+
+run "sftp_user_bare_slash_prefix" {
+  command = plan
+
+  variables {
+    name_prefix         = "test-val"
+    enable_sftp_ingress = true
+    create_sftp_server  = true
+    sftp_users = [
+      {
+        username              = "testuser"
+        ssh_public_key        = "ssh-rsa AAAAB3example testuser@example.com"
+        home_directory_prefix = "/"
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.sftp_users,
+  ]
+}
+
+################################################################################
+# Test: sftp_users path traversal ".." fails
+################################################################################
+
+run "sftp_user_path_traversal" {
+  command = plan
+
+  variables {
+    name_prefix         = "test-val"
+    enable_sftp_ingress = true
+    create_sftp_server  = true
+    sftp_users = [
+      {
+        username              = "testuser"
+        ssh_public_key        = "ssh-rsa AAAAB3example testuser@example.com"
+        home_directory_prefix = "/uploads/../etc/"
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.sftp_users,
+  ]
+}
+
+################################################################################
+# Test: sftp_users missing trailing slash fails
+################################################################################
+
+run "sftp_user_missing_trailing_slash" {
+  command = plan
+
+  variables {
+    name_prefix         = "test-val"
+    enable_sftp_ingress = true
+    create_sftp_server  = true
+    sftp_users = [
+      {
+        username              = "testuser"
+        ssh_public_key        = "ssh-rsa AAAAB3example testuser@example.com"
+        home_directory_prefix = "/uploads/testuser"
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.sftp_users,
+  ]
+}
+
+################################################################################
+# Test: sftp_server_id required when using existing server
+################################################################################
+
+run "sftp_server_id_required_when_existing" {
+  command = plan
+
+  variables {
+    name_prefix         = "test-val"
+    enable_sftp_ingress = true
+    create_sftp_server  = false
+    sftp_server_id      = null
+    sftp_users          = []
+  }
+
+  expect_failures = [
+    var.sftp_server_id,
+  ]
+}
+
+################################################################################
+# Test: sftp_egress_server_id required when using existing egress server
+################################################################################
+
+run "sftp_egress_server_id_required_when_existing" {
+  command = plan
+
+  variables {
+    name_prefix               = "test-val"
+    enable_sftp_ingress       = false
+    enable_sftp_egress        = true
+    create_sftp_egress_server = false
+    sftp_egress_server_id     = null
+  }
+
+  expect_failures = [
+    var.sftp_egress_server_id,
+  ]
+}

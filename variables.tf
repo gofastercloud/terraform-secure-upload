@@ -72,9 +72,14 @@ variable "create_sftp_server" {
 }
 
 variable "sftp_server_id" {
-  description = "Existing Transfer Family server ID. Required when create_sftp_server is false."
+  description = "Existing Transfer Family server ID. Required when enable_sftp_ingress is true and create_sftp_server is false."
   type        = string
   default     = null
+
+  validation {
+    condition     = var.create_sftp_server || !var.enable_sftp_ingress || var.sftp_server_id != null
+    error_message = "sftp_server_id is required when enable_sftp_ingress is true and create_sftp_server is false."
+  }
 }
 
 variable "sftp_endpoint_type" {
@@ -107,13 +112,29 @@ variable "sftp_allowed_cidrs" {
 }
 
 variable "sftp_users" {
-  description = "SFTP users to provision on the Transfer Family server."
+  description = "SFTP users to provision on the Transfer Family server. Each home_directory_prefix must be a real path (not bare /) starting and ending with /."
   type = list(object({
     username              = string
     ssh_public_key        = string
-    home_directory_prefix = optional(string, "/")
+    home_directory_prefix = string
   }))
   default = []
+
+  validation {
+    condition = alltrue([
+      for user in var.sftp_users :
+      can(regex("^/.+/$", user.home_directory_prefix))
+    ])
+    error_message = "Each sftp_users home_directory_prefix must start and end with / and contain at least one path component. A bare / is not allowed — ingress users must be scoped to a subdirectory (e.g. /uploads/partner-a/)."
+  }
+
+  validation {
+    condition = alltrue([
+      for user in var.sftp_users :
+      !can(regex("\\.\\.(/|$)", user.home_directory_prefix))
+    ])
+    error_message = "sftp_users home_directory_prefix must not contain '..' path traversal segments."
+  }
 }
 
 ################################################################################
@@ -133,9 +154,14 @@ variable "create_sftp_egress_server" {
 }
 
 variable "sftp_egress_server_id" {
-  description = "Existing Transfer Family server ID for egress. Required when create_sftp_egress_server is false."
+  description = "Existing Transfer Family server ID for egress. Required when enable_sftp_egress is true and create_sftp_egress_server is false."
   type        = string
   default     = null
+
+  validation {
+    condition     = var.create_sftp_egress_server || !var.enable_sftp_egress || var.sftp_egress_server_id != null
+    error_message = "sftp_egress_server_id is required when enable_sftp_egress is true and create_sftp_egress_server is false."
+  }
 }
 
 variable "sftp_egress_endpoint_type" {

@@ -6,6 +6,13 @@ locals {
   server_id  = var.create_sftp_server ? aws_transfer_server.this[0].id : var.existing_server_id
   server_arn = var.create_sftp_server ? aws_transfer_server.this[0].arn : "arn:aws:transfer:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:server/${var.existing_server_id}"
   sftp_users = { for user in var.sftp_users : user.username => user }
+
+  # Normalize home directory prefix for IAM policy patterns.
+  # Ensures a trailing / so "uploads/a" doesn't match "uploads/abc".
+  # A bare "/" becomes "" so the pattern is just "*" (full bucket — egress only).
+  home_prefix = { for k, v in local.sftp_users : k =>
+    v.home_directory_prefix == "/" ? "" : "${trimsuffix(trimprefix(v.home_directory_prefix, "/"), "/")}/"
+  }
 }
 
 ################################################################################
@@ -184,7 +191,7 @@ data "aws_iam_policy_document" "sftp_user" {
       test     = "StringLike"
       variable = "s3:prefix"
       values = [
-        "${trimprefix(each.value.home_directory_prefix, "/")}*",
+        "${local.home_prefix[each.key]}*",
       ]
     }
   }
@@ -201,7 +208,7 @@ data "aws_iam_policy_document" "sftp_user" {
       "s3:GetObjectVersion",
     ]
     resources = [
-      "${var.bucket_arn}/${trimprefix(each.value.home_directory_prefix, "/")}*",
+      "${var.bucket_arn}/${local.home_prefix[each.key]}*",
     ]
   }
 

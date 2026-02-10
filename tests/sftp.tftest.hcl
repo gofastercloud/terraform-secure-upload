@@ -20,8 +20,9 @@ run "sftp_new_server" {
     sftp_endpoint_type  = "PUBLIC"
     sftp_users = [
       {
-        username       = "testuser"
-        ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7example testuser@example.com"
+        username              = "testuser"
+        ssh_public_key        = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7example testuser@example.com"
+        home_directory_prefix = "/uploads/testuser/"
       }
     ]
   }
@@ -51,8 +52,9 @@ run "sftp_existing_server" {
     sftp_server_id      = "s-1234567890abcdef0"
     sftp_users = [
       {
-        username       = "testuser"
-        ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7example testuser@example.com"
+        username              = "testuser"
+        ssh_public_key        = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7example testuser@example.com"
+        home_directory_prefix = "/uploads/testuser/"
       }
     ]
   }
