@@ -248,7 +248,7 @@ resource "aws_transfer_user" "this" {
 
   home_directory_mappings {
     entry  = "/"
-    target = "/${var.bucket_name}${each.value.home_directory_prefix}"
+    target = trimsuffix("/${var.bucket_name}${each.value.home_directory_prefix}", "/")
   }
 
   tags = var.tags

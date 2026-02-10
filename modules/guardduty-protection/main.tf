@@ -50,6 +50,8 @@ data "aws_iam_policy_document" "guardduty_malware" {
     actions = [
       "s3:ListBucket",
       "s3:GetBucketLocation",
+      "s3:GetBucketNotification",
+      "s3:PutBucketNotification",
     ]
 
     resources = [var.ingress_bucket_arn]
@@ -65,6 +67,27 @@ data "aws_iam_policy_document" "guardduty_malware" {
     ]
 
     resources = [var.kms_key_arn]
+  }
+
+  statement {
+    sid    = "AllowEventBridgeManagedRule"
+    effect = "Allow"
+
+    actions = [
+      "events:PutRule",
+      "events:PutTargets",
+      "events:DeleteRule",
+      "events:RemoveTargets",
+      "events:DescribeRule",
+    ]
+
+    resources = ["arn:aws:events:*:${data.aws_caller_identity.current.account_id}:rule/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "events:ManagedBy"
+      values   = ["malware-protection-plan.guardduty.amazonaws.com"]
+    }
   }
 }
 

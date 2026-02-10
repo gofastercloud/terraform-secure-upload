@@ -71,6 +71,30 @@ resource "aws_kms_key" "this" {
           }
         }
       },
+      # CloudWatch Logs uses a regional service principal and requires
+      # a different condition key (encryption context) than other services.
+      {
+        Sid    = "AllowCloudWatchLogs"
+        Effect = "Allow"
+        Principal = {
+          Service = "logs.${local.region}.amazonaws.com"
+        }
+        Action = [
+          "kms:Decrypt",
+          "kms:Encrypt",
+          "kms:GenerateDataKey",
+          "kms:GenerateDataKeyWithoutPlaintext",
+          "kms:ReEncryptFrom",
+          "kms:ReEncryptTo",
+          "kms:DescribeKey",
+        ]
+        Resource = "*"
+        Condition = {
+          ArnLike = {
+            "kms:EncryptionContext:aws:logs:arn" = "arn:aws:logs:${local.region}:${local.account_id}:log-group:*"
+          }
+        }
+      },
     ]
   })
 
