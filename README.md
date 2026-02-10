@@ -88,9 +88,10 @@ module "secure_upload" {
   source = "path/to/terraform-secure-upload"
 
   name_prefix = "myapp"
-  enable_sftp_ingress = false
 }
 ```
+
+This creates the S3 pipeline (ingress, egress, quarantine, logs), GuardDuty scanning, Lambda router, and SNS alerting. No SFTP resources are created by default — enable them with `enable_sftp_ingress` or `enable_sftp_egress`.
 
 ## Full Usage
 
@@ -146,8 +147,9 @@ module "secure_upload" {
   enable_sftp_egress = true
   sftp_egress_users = [
     {
-      username       = "receiver-a"
-      ssh_public_key = file("keys/receiver-a.pub")
+      username              = "receiver-a"
+      ssh_public_key        = file("keys/receiver-a.pub")
+      home_directory_prefix = "/"
     },
   ]
 
@@ -160,44 +162,86 @@ module "secure_upload" {
 
 ## Inputs
 
+### General
+
 | Name | Description | Type | Default | Required |
 |---|---|---|---|---|
-| `name_prefix` | Prefix applied to all resource names for namespacing. Must be lowercase alphanumeric with hyphens. | `string` | — | yes |
+| `name_prefix` | Prefix applied to all resource names. Must be lowercase alphanumeric with hyphens. | `string` | — | yes |
 | `tags` | Tags applied to every resource created by this module. | `map(string)` | `{}` | no |
-| `create_kms_key` | Whether to create a new KMS key. Set to `false` when providing your own key via `kms_key_arn`. | `bool` | `true` | no |
+
+### KMS
+
+| Name | Description | Type | Default | Required |
+|---|---|---|---|---|
+| `create_kms_key` | Create a new KMS key. Set to `false` when providing your own via `kms_key_arn`. | `bool` | `true` | no |
 | `kms_key_deletion_window_days` | Days before a KMS key is permanently deleted after scheduling deletion (7–30). | `number` | `30` | no |
 | `kms_key_arn` | ARN of an existing KMS key. Required when `create_kms_key` is `false`. | `string` | `null` | no |
-| `enable_sftp_ingress` | Whether to enable the SFTP upload path via AWS Transfer Family. | `bool` | `false` | no |
-| `create_sftp_server` | Create a new Transfer Family server. Set `false` to attach to an existing server. | `bool` | `true` | no |
-| `sftp_server_id` | Existing Transfer Family server ID. Required when `create_sftp_server` is `false`. | `string` | `null` | no |
-| `sftp_endpoint_type` | Transfer Family endpoint type — `PUBLIC` or `VPC`. | `string` | `"PUBLIC"` | no |
-| `sftp_vpc_id` | VPC ID for a VPC-type Transfer Family endpoint. | `string` | `null` | no |
-| `sftp_subnet_ids` | Subnet IDs for a VPC-type Transfer Family endpoint. | `list(string)` | `[]` | no |
-| `sftp_allowed_cidrs` | CIDR blocks allowed to access the SFTP server (VPC security group). Required for VPC endpoint type. | `list(string)` | `[]` | no |
-| `sftp_users` | SFTP users to provision. Each object has `username`, `ssh_public_key`, and optional `home_directory_prefix`. | `list(object)` | `[]` | no |
-| `enable_sftp_egress` | Whether to enable an egress SFTP endpoint for the egress bucket (read-only). | `bool` | `false` | no |
-| `create_sftp_egress_server` | Create a new Transfer Family server for egress. Set `false` to attach to an existing server. | `bool` | `true` | no |
-| `sftp_egress_server_id` | Existing Transfer Family server ID for egress. Required when `create_sftp_egress_server` is `false`. | `string` | `null` | no |
-| `sftp_egress_endpoint_type` | Transfer Family endpoint type for egress — `PUBLIC` or `VPC`. | `string` | `"PUBLIC"` | no |
-| `sftp_egress_vpc_id` | VPC ID for a VPC-type egress Transfer Family endpoint. | `string` | `null` | no |
-| `sftp_egress_subnet_ids` | Subnet IDs for a VPC-type egress Transfer Family endpoint. | `list(string)` | `[]` | no |
-| `sftp_egress_allowed_cidrs` | CIDR blocks allowed to access the egress SFTP server. | `list(string)` | `[]` | no |
-| `sftp_egress_users` | SFTP users for egress (read-only access to egress bucket). | `list(object)` | `[]` | no |
+
+### SFTP Ingress
+
+| Name | Description | Type | Default | Required |
+|---|---|---|---|---|
+| `enable_sftp_ingress` | Enable the SFTP upload path via AWS Transfer Family. When `false` (default), no Transfer Family resources are created for ingress. | `bool` | `false` | no |
+| `create_sftp_server` | Create a new Transfer Family server for ingress. Only takes effect when `enable_sftp_ingress` is `true`. Set `false` to attach users to an existing server via `sftp_server_id`. | `bool` | `true` | no |
+| `sftp_server_id` | ID of an existing Transfer Family server. Only used when `enable_sftp_ingress` is `true` and `create_sftp_server` is `false`. | `string` | `null` | no |
+| `sftp_endpoint_type` | Transfer Family endpoint type — `PUBLIC` or `VPC`. Only used when both `enable_sftp_ingress` and `create_sftp_server` are `true`. | `string` | `"PUBLIC"` | no |
+| `sftp_vpc_id` | VPC ID for a VPC-type ingress endpoint. Required when `sftp_endpoint_type` is `VPC`. | `string` | `null` | no |
+| `sftp_subnet_ids` | Subnet IDs for a VPC-type ingress endpoint. Required when `sftp_endpoint_type` is `VPC`. | `list(string)` | `[]` | no |
+| `sftp_allowed_cidrs` | CIDR blocks allowed to access the ingress SFTP server security group. Required when `sftp_endpoint_type` is `VPC`. | `list(string)` | `[]` | no |
+| `sftp_users` | Ingress SFTP users. Each must have `username`, `ssh_public_key`, and `home_directory_prefix` (must start/end with `/`, e.g. `/uploads/partner-a/`). Bare `/` is not allowed. | `list(object)` | `[]` | no |
+
+### SFTP Egress
+
+| Name | Description | Type | Default | Required |
+|---|---|---|---|---|
+| `enable_sftp_egress` | Enable an egress SFTP endpoint for read-only access to the egress bucket. When `false` (default), no Transfer Family resources are created for egress. | `bool` | `false` | no |
+| `create_sftp_egress_server` | Create a new Transfer Family server for egress. Only takes effect when `enable_sftp_egress` is `true`. Set `false` to attach users to an existing server via `sftp_egress_server_id`. | `bool` | `true` | no |
+| `sftp_egress_server_id` | ID of an existing Transfer Family server for egress. Only used when `enable_sftp_egress` is `true` and `create_sftp_egress_server` is `false`. | `string` | `null` | no |
+| `sftp_egress_endpoint_type` | Transfer Family endpoint type for egress — `PUBLIC` or `VPC`. Only used when both `enable_sftp_egress` and `create_sftp_egress_server` are `true`. | `string` | `"PUBLIC"` | no |
+| `sftp_egress_vpc_id` | VPC ID for a VPC-type egress endpoint. Required when `sftp_egress_endpoint_type` is `VPC`. | `string` | `null` | no |
+| `sftp_egress_subnet_ids` | Subnet IDs for a VPC-type egress endpoint. Required when `sftp_egress_endpoint_type` is `VPC`. | `list(string)` | `[]` | no |
+| `sftp_egress_allowed_cidrs` | CIDR blocks allowed to access the egress SFTP server security group. Required when `sftp_egress_endpoint_type` is `VPC`. | `list(string)` | `[]` | no |
+| `sftp_egress_users` | Egress SFTP users (read-only). `home_directory_prefix` is required and must start/end with `/` (use `/` for full bucket access or a subdirectory to scope). | `list(object)` | `[]` | no |
+
+### S3 Lifecycle
+
+| Name | Description | Type | Default | Required |
+|---|---|---|---|---|
 | `ingress_lifecycle_days` | Days before objects in the ingress bucket expire. | `number` | `1` | no |
 | `egress_lifecycle_days` | Days before objects in the egress bucket transition to Infrequent Access. | `number` | `90` | no |
 | `quarantine_lifecycle_days` | Days before objects in the quarantine bucket expire. | `number` | `365` | no |
+
+### Lambda
+
+| Name | Description | Type | Default | Required |
+|---|---|---|---|---|
 | `lambda_runtime` | Lambda runtime identifier for the file-router function. | `string` | `"python3.12"` | no |
 | `lambda_memory_size` | Memory (MB) allocated to the file-router Lambda (128–10240). | `number` | `256` | no |
 | `lambda_timeout` | Timeout (seconds) for the file-router Lambda (1–900). | `number` | `60` | no |
 | `lambda_reserved_concurrency` | Reserved concurrent executions for the file-router Lambda. | `number` | `10` | no |
+
+### Notifications
+
+| Name | Description | Type | Default | Required |
+|---|---|---|---|---|
 | `sns_subscription_emails` | Email addresses subscribed to the malware-alert SNS topic. | `list(string)` | `[]` | no |
+
+### Quarantine — Object Lock
+
+| Name | Description | Type | Default | Required |
+|---|---|---|---|---|
 | `enable_object_lock` | Enable S3 Object Lock on the quarantine bucket for tamper-proof retention. | `bool` | `false` | no |
 | `object_lock_retention_days` | Default retention period in days for Object Lock on the quarantine bucket. | `number` | `365` | no |
 | `object_lock_retention_mode` | Object Lock retention mode — `GOVERNANCE` or `COMPLIANCE`. | `string` | `"GOVERNANCE"` | no |
-| `create_log_bucket` | Whether to create a managed S3 access-log bucket. Set to `false` when shipping logs to an existing bucket via `log_bucket_name`. | `bool` | `true` | no |
+
+### Logging
+
+| Name | Description | Type | Default | Required |
+|---|---|---|---|---|
+| `create_log_bucket` | Create a managed S3 access-log bucket. Set to `false` when shipping logs to an existing bucket via `log_bucket_name`. | `bool` | `true` | no |
 | `log_bucket_name` | Name of an existing S3 bucket for access-log shipping. Required when `create_log_bucket` is `false`. | `string` | `null` | no |
 | `log_retention_days` | CloudWatch Logs retention period in days. Must be a valid CloudWatch retention value. | `number` | `90` | no |
-| `s3_log_retention_days` | Number of days to retain S3 access logs in the log bucket. | `number` | `90` | no |
+| `s3_log_retention_days` | Days to retain S3 access logs in the log bucket. | `number` | `90` | no |
 
 ## Outputs
 

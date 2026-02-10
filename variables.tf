@@ -194,13 +194,29 @@ variable "sftp_egress_allowed_cidrs" {
 }
 
 variable "sftp_egress_users" {
-  description = "Egress SFTP users with read-only access to the egress bucket. home_directory_prefix defaults to / (full bucket); set to a subdirectory (e.g. /outbound/partner/) to scope access."
+  description = "Egress SFTP users with read-only access to the egress bucket. home_directory_prefix must start and end with / (use / for full bucket access, or a subdirectory like /outbound/partner-a/ to scope access)."
   type = list(object({
     username              = string
     ssh_public_key        = string
-    home_directory_prefix = optional(string, "/")
+    home_directory_prefix = string
   }))
   default = []
+
+  validation {
+    condition = alltrue([
+      for user in var.sftp_egress_users :
+      can(regex("^/", user.home_directory_prefix)) && can(regex("/$", user.home_directory_prefix))
+    ])
+    error_message = "Each sftp_egress_users home_directory_prefix must start and end with / (e.g. / for full bucket or /outbound/partner-a/ for scoped access)."
+  }
+
+  validation {
+    condition = alltrue([
+      for user in var.sftp_egress_users :
+      !can(regex("\\.\\.(/|$)", user.home_directory_prefix))
+    ])
+    error_message = "sftp_egress_users home_directory_prefix must not contain '..' path traversal segments."
+  }
 }
 
 ################################################################################

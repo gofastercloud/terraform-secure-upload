@@ -94,11 +94,11 @@ variable "kms_key_arn" {
 }
 
 variable "sftp_users" {
-  description = "List of SFTP users to create"
+  description = "SFTP users to create. home_directory_prefix must start and end with / and is used for home directory mapping and IAM policy scoping."
   type = list(object({
     username              = string
     ssh_public_key        = string
-    home_directory_prefix = optional(string, "/")
+    home_directory_prefix = string
   }))
   default = []
 }

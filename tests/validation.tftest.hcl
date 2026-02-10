@@ -408,3 +408,53 @@ run "sftp_egress_server_id_required_when_existing" {
     var.sftp_egress_server_id,
   ]
 }
+
+################################################################################
+# Test: sftp_egress_users missing leading slash fails
+################################################################################
+
+run "sftp_egress_user_missing_leading_slash" {
+  command = plan
+
+  variables {
+    name_prefix         = "test-val"
+    enable_sftp_ingress = false
+    enable_sftp_egress  = true
+    sftp_egress_users = [
+      {
+        username              = "receiver"
+        ssh_public_key        = "ssh-rsa AAAAB3example receiver@example.com"
+        home_directory_prefix = "outbound/"
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.sftp_egress_users,
+  ]
+}
+
+################################################################################
+# Test: sftp_egress_users path traversal fails
+################################################################################
+
+run "sftp_egress_user_path_traversal" {
+  command = plan
+
+  variables {
+    name_prefix         = "test-val"
+    enable_sftp_ingress = false
+    enable_sftp_egress  = true
+    sftp_egress_users = [
+      {
+        username              = "receiver"
+        ssh_public_key        = "ssh-rsa AAAAB3example receiver@example.com"
+        home_directory_prefix = "/outbound/../secrets/"
+      }
+    ]
+  }
+
+  expect_failures = [
+    var.sftp_egress_users,
+  ]
+}

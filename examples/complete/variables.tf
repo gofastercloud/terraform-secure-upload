@@ -85,11 +85,11 @@ variable "sftp_allowed_cidrs" {
 }
 
 variable "sftp_users" {
-  description = "SFTP users to provision."
+  description = "Ingress SFTP users. home_directory_prefix must start/end with / and contain at least one path component (e.g. /uploads/partner-a/)."
   type = list(object({
     username              = string
     ssh_public_key        = string
-    home_directory_prefix = optional(string, "/")
+    home_directory_prefix = string
   }))
   default = []
 }
@@ -107,11 +107,11 @@ variable "create_sftp_egress_server" {
 }
 
 variable "sftp_egress_users" {
-  description = "SFTP users for egress (read-only)."
+  description = "Egress SFTP users (read-only). home_directory_prefix must start/end with / (use / for full bucket access)."
   type = list(object({
     username              = string
     ssh_public_key        = string
-    home_directory_prefix = optional(string, "/")
+    home_directory_prefix = string
   }))
   default = []
 }

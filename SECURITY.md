@@ -31,6 +31,7 @@ This module follows AWS security best practices by default:
 - **Public access blocked** — All buckets have S3 Block Public Access enabled on every setting.
 - **Bucket ownership enforced** — ACLs are disabled; the bucket owner controls all objects.
 - **Object Lock** — Optional WORM retention on the quarantine bucket for tamper-proof evidence preservation.
+- **SFTP path isolation** — Ingress SFTP users are scoped to a subdirectory via validated `home_directory_prefix` (bare `/` and `..` path traversal are rejected). IAM policies enforce a trailing `/` separator to prevent prefix-overlap attacks.
 - **Dead letter queue** — Failed Lambda invocations are captured in an SQS DLQ so no scan results are silently lost.
 
 ## Supported Versions

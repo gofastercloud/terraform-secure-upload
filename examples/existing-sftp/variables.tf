@@ -15,11 +15,11 @@ variable "sftp_server_id" {
 }
 
 variable "sftp_users" {
-  description = "SFTP users to provision on the existing server."
+  description = "Ingress SFTP users. home_directory_prefix must start/end with / and contain at least one path component (e.g. /uploads/partner-a/)."
   type = list(object({
     username              = string
     ssh_public_key        = string
-    home_directory_prefix = optional(string, "/")
+    home_directory_prefix = string
   }))
   default = []
 }

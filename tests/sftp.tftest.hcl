@@ -106,8 +106,9 @@ run "sftp_egress_enabled" {
     enable_sftp_egress  = true
     sftp_egress_users = [
       {
-        username       = "receiver"
-        ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7egress receiver@example.com"
+        username              = "receiver"
+        ssh_public_key        = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7egress receiver@example.com"
+        home_directory_prefix = "/"
       }
     ]
   }
