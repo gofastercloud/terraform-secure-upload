@@ -182,6 +182,7 @@ def handler(event, context):
                     [{"name": "PromptInjection", "score": score}],
                     file_size=file_size,
                     vt_result=vt_result,
+                    pi_score=score,
                 )
         return _route_egress(source_bucket, object_key, file_size=file_size, vt_result=vt_result)
     elif scan_result_status == "THREATS_FOUND":
@@ -326,7 +327,7 @@ def _route_egress(source_bucket, object_key, file_size=0, vt_result=None):
                 "bucket": EGRESS_BUCKET,
                 "key": object_key,
                 "size_bytes": file_size,
-                "scans": _build_scan_summary(vt_result=vt_result),
+                "scans": _build_scan_summary(scan_result_status="NO_THREATS_FOUND", vt_result=vt_result),
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
             sns.publish(
@@ -342,9 +343,9 @@ def _route_egress(source_bucket, object_key, file_size=0, vt_result=None):
         raise
 
 
-def _build_scan_summary(vt_result=None):
+def _build_scan_summary(scan_result_status="NO_THREATS_FOUND", vt_result=None, pi_score=None):
     """Build a summary of scan results for notifications."""
-    summary = {"guardduty": "NO_THREATS_FOUND"}
+    summary = {"guardduty": scan_result_status}
     if VIRUSTOTAL_FUNCTION_NAME:
         if vt_result:
             summary["virustotal"] = {
@@ -356,13 +357,16 @@ def _build_scan_summary(vt_result=None):
                 "source": vt_result.get("source", "unknown"),
             }
         else:
-            summary["virustotal"] = "clean"
+            summary["virustotal"] = "not_checked" if scan_result_status == "THREATS_FOUND" else "clean"
     if SCANNER_FUNCTION_NAME:
-        summary["prompt_injection"] = "clean"
+        if pi_score is not None:
+            summary["prompt_injection"] = {"score": pi_score, "threshold": PROMPT_INJECTION_THRESHOLD}
+        else:
+            summary["prompt_injection"] = "not_checked" if scan_result_status == "THREATS_FOUND" else "clean"
     return summary
 
 
-def _route_quarantine(source_bucket, object_key, scan_result_status, threats, file_size=0, vt_result=None):
+def _route_quarantine(source_bucket, object_key, scan_result_status, threats, file_size=0, vt_result=None, pi_score=None):
     try:
         # Idempotency: if source object is already gone, skip
         if not _object_exists(source_bucket, object_key):
@@ -377,6 +381,10 @@ def _route_quarantine(source_bucket, object_key, scan_result_status, threats, fi
                      detail={"destination": QUARANTINE_BUCKET, "reason": scan_result_status, "threats": threats},
                      file_size=file_size)
 
+        # Derive GuardDuty status: only THREATS_FOUND means GD caught it;
+        # VT/PI quarantines happen after GD passed the file.
+        gd_status = scan_result_status if scan_result_status == "THREATS_FOUND" else "NO_THREATS_FOUND"
+
         message = {
             "alert": "Malware detected in uploaded file",
             "file_key": object_key,
@@ -384,7 +392,7 @@ def _route_quarantine(source_bucket, object_key, scan_result_status, threats, fi
             "quarantine_bucket": QUARANTINE_BUCKET,
             "scan_result_status": scan_result_status,
             "threats": threats,
-            "scans": _build_scan_summary(vt_result=vt_result),
+            "scans": _build_scan_summary(scan_result_status=gd_status, vt_result=vt_result, pi_score=pi_score),
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.2] - 2026-02-10
+
+### Fixed
+
+- **Scan summary hardcoded NO_THREATS_FOUND for all quarantine paths** — `_build_scan_summary()` always reported GuardDuty as `NO_THREATS_FOUND` and downstream scanners as `clean`, even when GuardDuty found threats or VT/PI triggered quarantine. The function now accepts the actual scan results: GuardDuty status is derived from the routing reason, VT results are passed through, PI score is included when it triggered quarantine, and scanners that didn't run show `not_checked` instead of `clean`.
+
 ## [0.7.1] - 2026-02-10
 
 ### Fixed
