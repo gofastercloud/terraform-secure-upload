@@ -98,17 +98,17 @@ run "bucket_naming" {
   command = plan
 
   assert {
-    condition     = output.ingress_bucket_id == "test-upload-ingress"
+    condition     = startswith(output.ingress_bucket_id, "test-upload-") && endswith(output.ingress_bucket_id, "-ingress")
     error_message = "Ingress bucket should follow naming convention: ${output.ingress_bucket_id}"
   }
 
   assert {
-    condition     = output.egress_bucket_id == "test-upload-egress"
+    condition     = startswith(output.egress_bucket_id, "test-upload-") && endswith(output.egress_bucket_id, "-egress")
     error_message = "Egress bucket should follow naming convention: ${output.egress_bucket_id}"
   }
 
   assert {
-    condition     = output.quarantine_bucket_id == "test-upload-quarantine"
+    condition     = startswith(output.quarantine_bucket_id, "test-upload-") && endswith(output.quarantine_bucket_id, "-quarantine")
     error_message = "Quarantine bucket should follow naming convention: ${output.quarantine_bucket_id}"
   }
 }

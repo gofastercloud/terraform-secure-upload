@@ -3,12 +3,13 @@
 ################################################################################
 
 locals {
+  account_hash  = substr(sha256(data.aws_caller_identity.current.account_id), 0, 8)
   log_bucket_id = var.create_log_bucket ? aws_s3_bucket.logs[0].id : var.external_log_bucket_id
 }
 
 resource "aws_s3_bucket" "logs" {
   count  = var.create_log_bucket ? 1 : 0
-  bucket = "${var.name_prefix}-logs"
+  bucket = "${var.name_prefix}-${local.account_hash}-logs"
   tags   = var.tags
 }
 
@@ -111,6 +112,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
   rule {
     id     = "expire-logs"
     status = "Enabled"
+    filter {}
 
     transition {
       days          = 30
@@ -128,7 +130,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
 ################################################################################
 
 resource "aws_s3_bucket" "ingress" {
-  bucket = "${var.name_prefix}-ingress"
+  bucket = "${var.name_prefix}-${local.account_hash}-ingress"
   tags   = var.tags
 }
 
@@ -211,7 +213,7 @@ data "aws_iam_policy_document" "ssl_only_ingress" {
     }
 
     condition {
-      test     = "StringNotEquals"
+      test     = "StringNotEqualsIfExists"
       variable = "s3:x-amz-server-side-encryption"
       values   = ["aws:kms"]
     }
@@ -231,7 +233,7 @@ data "aws_iam_policy_document" "ssl_only_ingress" {
     }
 
     condition {
-      test     = "StringNotEquals"
+      test     = "StringNotEqualsIfExists"
       variable = "s3:x-amz-server-side-encryption-aws-kms-key-id"
       values   = [var.kms_key_arn]
     }
@@ -249,6 +251,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "ingress" {
   rule {
     id     = "expire-ingress"
     status = "Enabled"
+    filter {}
 
     expiration {
       days = var.ingress_lifecycle_days
@@ -261,7 +264,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "ingress" {
 ################################################################################
 
 resource "aws_s3_bucket" "egress" {
-  bucket = "${var.name_prefix}-egress"
+  bucket = "${var.name_prefix}-${local.account_hash}-egress"
   tags   = var.tags
 }
 
@@ -344,7 +347,7 @@ data "aws_iam_policy_document" "ssl_only_egress" {
     }
 
     condition {
-      test     = "StringNotEquals"
+      test     = "StringNotEqualsIfExists"
       variable = "s3:x-amz-server-side-encryption"
       values   = ["aws:kms"]
     }
@@ -364,7 +367,7 @@ data "aws_iam_policy_document" "ssl_only_egress" {
     }
 
     condition {
-      test     = "StringNotEquals"
+      test     = "StringNotEqualsIfExists"
       variable = "s3:x-amz-server-side-encryption-aws-kms-key-id"
       values   = [var.kms_key_arn]
     }
@@ -382,6 +385,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "egress" {
   rule {
     id     = "transition-to-ia"
     status = "Enabled"
+    filter {}
 
     transition {
       days          = var.egress_lifecycle_days
@@ -395,7 +399,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "egress" {
 ################################################################################
 
 resource "aws_s3_bucket" "quarantine" {
-  bucket              = "${var.name_prefix}-quarantine"
+  bucket              = "${var.name_prefix}-${local.account_hash}-quarantine"
   object_lock_enabled = var.enable_object_lock
   tags                = var.tags
 
@@ -497,7 +501,7 @@ data "aws_iam_policy_document" "ssl_only_quarantine" {
     }
 
     condition {
-      test     = "StringNotEquals"
+      test     = "StringNotEqualsIfExists"
       variable = "s3:x-amz-server-side-encryption"
       values   = ["aws:kms"]
     }
@@ -517,7 +521,7 @@ data "aws_iam_policy_document" "ssl_only_quarantine" {
     }
 
     condition {
-      test     = "StringNotEquals"
+      test     = "StringNotEqualsIfExists"
       variable = "s3:x-amz-server-side-encryption-aws-kms-key-id"
       values   = [var.kms_key_arn]
     }
@@ -535,6 +539,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "quarantine" {
   rule {
     id     = "expire-quarantine"
     status = "Enabled"
+    filter {}
 
     expiration {
       days = var.quarantine_lifecycle_days
