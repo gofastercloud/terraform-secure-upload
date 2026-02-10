@@ -2,10 +2,11 @@
 
 ## Overview
 
-This Terraform module provides a secure file upload pipeline with automated malware scanning
-and optional prompt injection detection. Files uploaded via S3 API or SFTP are scanned by
-GuardDuty Malware Protection, then optionally scanned for prompt injection attacks using an
-ONNX model, before being routed to egress or quarantine buckets based on scan results.
+This Terraform module provides a secure file upload pipeline with automated malware scanning,
+optional VirusTotal hash lookup, and optional prompt injection detection. Files uploaded via
+S3 API or SFTP are scanned by GuardDuty Malware Protection. If enabled, VirusTotal scanning
+runs in parallel via EventBridge, tagging objects with results. The file router reads all scan
+results and routes files to egress or quarantine buckets accordingly.
 
 ## Flow
 
@@ -16,45 +17,53 @@ ONNX model, before being routed to egress or quarantine buckets based on scan re
                     └──────┬──────┘
                            │
                            ▼
-┌─────────────┐    ┌──────────────┐    ┌────────────────────┐
-│  SFTP User  │───>│   Ingress    │───>│  GuardDuty Malware │
-│  (Transfer  │    │   Bucket     │    │  Protection for S3 │
-│   Family)   │    └──────────────┘    └─────────┬──────────┘
-└─────────────┘                                  │
-                                                 │ EventBridge
-                                                 ▼
-                                        ┌────────────────┐
-                                        │  Router Lambda │
-                                        └───┬────────┬───┘
-                                            │        │
-                                   Clean    │        │  Malware
-                                            │        ▼
-                                            │   ┌──────────────┐
-                                  [scanning │   │  Quarantine  │
-                                   enabled?]│   │    Bucket    │
-                                     │      │   └──────┬───────┘
-                                    YES     │          │
-                                     │     NO          ▼
-                                     ▼      │   ┌──────────────┐
-                              ┌──────────┐  │   │  SNS Alert   │
-                              │  Prompt  │  │   │    Topic     │
-                              │ Injection│  │   └──────────────┘
-                              │ Scanner  │  │
-                              └──┬───┬───┘  │
-                          Safe   │   │ Risky│
-                                 │   │      │
-                                 │   └──────┤
-                                 ▼          │
-                              ┌──────────┐  │
-                              │  Egress  │  │
-                              │  Bucket  │  │
-                              └────┬─────┘  │
-                                   │        │
-                                   ▼        ▼
-                          ┌─────────────┐  (Quarantine
-                          │ SFTP Egress │   + SNS Alert)
-                          │ (read-only) │
-                          └─────────────┘
+┌─────────────┐    ┌──────────────┐
+│  SFTP User  │───>│   Ingress    │
+│  (Transfer  │    │   Bucket     │
+│   Family)   │    └──────┬───────┘
+└─────────────┘           │
+                 ┌────────┴─────────┐
+                 │                  │
+                 ▼                  ▼
+      ┌────────────────────┐  ┌──────────────┐
+      │  GuardDuty Malware │  │  VirusTotal  │
+      │  Protection for S3 │  │  Hash Lookup │
+      └─────────┬──────────┘  │ (tags object)│
+                │             └──────────────┘
+                │ EventBridge
+                ▼
+       ┌────────────────┐
+       │  Router Lambda │ (reads VT tags)
+       └───┬────────┬───┘
+           │        │
+  Clean    │        │  Malware / VT positive
+           │        ▼
+           │   ┌──────────────┐
+ [scanning │   │  Quarantine  │
+  enabled?]│   │    Bucket    │
+    │      │   └──────┬───────┘
+   YES     │          │
+    │     NO          ▼
+    ▼      │   ┌──────────────┐
+ ┌──────────┐  │   │  SNS Alert   │
+ │  Prompt  │  │   │    Topic     │
+ │ Injection│  │   └──────────────┘
+ │ Scanner  │  │
+ └──┬───┬───┘  │
+Safe │   │Risky│
+    │   │      │
+    │   └──────┤
+    ▼          │
+ ┌──────────┐  │
+ │  Egress  │  │
+ │  Bucket  │  │
+ └────┬─────┘  │
+      │        │
+      ▼        ▼
+┌─────────────┐  (Quarantine
+│ SFTP Egress │   + SNS Alert)
+│ (read-only) │
+└─────────────┘
 ```
 
 ## Module Structure
@@ -75,7 +84,8 @@ terraform-secure-upload/
 ├── prompt-injection.tf  # ECR repo, scanner Lambda, IAM (gated on enable flag)
 ├── prompt-injection-variables.tf  # Scanner configuration variables
 ├── lambda/
-│   └── file_router.py   # Lambda function source code
+│   ├── file_router.py   # Lambda function — routes files based on scan results
+│   └── virustotal_scanner.py  # Lambda function — VT hash lookup + S3 tagging
 ├── functions/
 │   └── prompt_injection_scanner/  # Container-image Lambda
 │       ├── Dockerfile             # Python 3.12 + ONNX model + doc parsing libs
@@ -85,6 +95,8 @@ terraform-secure-upload/
 │   ├── basic/           # S3-only upload, minimal config
 │   ├── complete/        # Full config with SFTP, custom KMS, VPC
 │   └── existing-sftp/   # Using existing Transfer Family server
+├── test-files/
+│   └── generate.py      # uv-runnable script to create test files (clean, EICAR, PI)
 ├── tests/               # Terraform native tests (.tftest.hcl)
 │   ├── validation.tftest.hcl      # Variable validation tests (runs in CI, no AWS creds)
 │   ├── basic.tftest.hcl           # Plan-level module instantiation tests
@@ -147,7 +159,15 @@ terraform-secure-upload/
     auto-bumps to `scanner_timeout + 30s` when scanning is enabled. The scanner
     image is ~1.6GB; cold starts benefit from higher memory (more CPU).
 
-12. **CloudWatch dashboard**: Optional observability layer gated behind
+12. **Parallel VirusTotal scanning**: When enabled, the VT scanner triggers immediately
+    on upload via an EventBridge rule on S3 Object Created events, running in parallel
+    with GuardDuty's deeper scan. VT results are written as S3 object tags (`vt-status`,
+    `vt-positives`, `vt-total`, `vt-sha256`). The file router reads these tags when making
+    its routing decision, falling back to synchronous invocation if tags are absent (race
+    condition safety). This architecture eliminates sequential latency without sacrificing
+    reliability.
+
+13. **CloudWatch dashboard**: Optional observability layer gated behind
     `enable_cloudwatch_dashboard`. Uses CloudWatch metric filters on the existing
     Lambda log group to derive file routing metrics (egress, quarantine, review,
     skipped) without any Lambda code changes. The dashboard combines custom metrics

@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2026-02-10
+
+### Changed
+
+- **VirusTotal scanning runs in parallel with GuardDuty** — The VirusTotal hash lookup now triggers immediately when a file lands in the ingress bucket via an EventBridge rule on S3 Object Created events, running concurrently with GuardDuty's deeper scan. Previously, VT ran sequentially inside the file router after GuardDuty completed. VT results are stored as S3 object tags (`vt-status`, `vt-positives`, `vt-total`, `vt-sha256`) which the file router reads when making its routing decision. If VT hasn't finished by the time the file router runs (unlikely but possible), it falls back to synchronous invocation.
+- **Richer notification messages** — Quarantine alerts and egress notifications now include detailed scan results from all scanners (GuardDuty status, VirusTotal positives/total/SHA-256, prompt injection score) in a structured `scans` field.
+
+### Added
+
+- **S3 EventBridge notifications on ingress bucket** — `aws_s3_bucket_notification` resource enables EventBridge delivery for Object Created events.
+- **EventBridge rule for VT scanner** — new rule + target + permission (conditional on `enable_virustotal_scanning`) triggers VT scanner Lambda on S3 uploads.
+- **S3 object tagging by VT scanner** — VT scanner writes results as object tags after scanning, enabling the file router to read results without a synchronous invoke.
+- **Test file generator** — `test-files/generate.py` (uv-runnable) produces clean, EICAR, and prompt injection test files in `.txt`, `.pdf`, and `.docx` formats for pipeline validation.
+
+## [0.6.0] - 2026-02-10
+
+### Added
+
+- **VirusTotal hash lookup scanning** — optional SHA-256 hash check against the VirusTotal API. Files that pass GuardDuty are checked against VT; those with detections at or above `virustotal_threshold` are quarantined. API key stored as SSM SecureString.
+- **File processing audit trail** — optional DynamoDB table records every file at each pipeline stage (received, GuardDuty, VirusTotal, prompt injection, routed) with configurable TTL retention via `audit_trail_retention_days`.
+- **Egress notifications** — optional SNS topic fires when clean files reach the egress bucket, enabling downstream automation.
+- **CloudWatch dashboard metric filters** — expanded dashboard with VirusTotal scan metrics, prompt injection metrics, and egress notification tracking.
+- **New variables** — `enable_virustotal_scanning`, `virustotal_api_key`, `virustotal_threshold`, `enable_egress_notifications`, `egress_notification_emails`, `enable_audit_trail`, `audit_trail_retention_days`, `enable_cloudwatch_dashboard`.
+- **New outputs** — `virustotal_scanner_function_arn`, `egress_sns_topic_arn`, `audit_trail_table_arn`, `audit_trail_table_name`, `cloudwatch_dashboard_arn`.
+
 ## [0.5.0] - 2026-02-10
 
 ### Added
