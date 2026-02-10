@@ -29,3 +29,18 @@ deployments/
 
 # Model cache (prompt injection scanner)
 functions/prompt_injection_scanner/model/
+
+# Sensitive files – defence in depth
+*.tfvars
+!*.tfvars.example
+.env
+.env.*
+override.tf
+override.tf.json
+crash.log
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
