@@ -81,6 +81,7 @@ variable "pagerduty_integration_url" {
   description = "PagerDuty Events v2 integration URL for malware alert notifications. When non-null, an SNS HTTPS subscription is created to forward alerts to PagerDuty."
   type        = string
   default     = null
+  sensitive   = true
 
   validation {
     condition     = var.pagerduty_integration_url == null || can(regex("^https://events\\.pagerduty\\.com/", var.pagerduty_integration_url))
@@ -96,6 +97,7 @@ variable "victorops_integration_url" {
   description = "VictorOps (Splunk On-Call) REST endpoint URL for malware alert notifications. When non-null, an SNS HTTPS subscription is created to forward alerts to VictorOps."
   type        = string
   default     = null
+  sensitive   = true
 
   validation {
     condition     = var.victorops_integration_url == null || can(regex("^https://alert\\.victorops\\.com/", var.victorops_integration_url))
@@ -139,6 +141,7 @@ variable "servicenow_instance_url" {
   description = "ServiceNow instance URL (e.g. https://mycompany.service-now.com). Required when enable_servicenow_integration is true."
   type        = string
   default     = null
+  sensitive   = true
 
   validation {
     condition     = !var.enable_servicenow_integration || var.servicenow_instance_url != null
