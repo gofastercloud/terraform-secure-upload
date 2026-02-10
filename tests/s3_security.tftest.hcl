@@ -7,7 +7,7 @@ provider "aws" {
 }
 
 variables {
-  name_prefix = "test-s3sec"
+  name_prefix         = "test-s3sec"
   enable_sftp_ingress = false
 }
 
@@ -23,9 +23,9 @@ run "ingress_bucket_versioning" {
   }
 
   variables {
-    name_prefix              = "test-s3sec"
-    kms_key_arn              = "arn:aws:kms:us-east-1:123456789012:key/test-key-id"
-    ingress_lifecycle_days   = 1
+    name_prefix               = "test-s3sec"
+    kms_key_arn               = "arn:aws:kms:us-east-1:123456789012:key/test-key-id"
+    ingress_lifecycle_days    = 1
     egress_lifecycle_days     = 90
     quarantine_lifecycle_days = 365
   }
@@ -46,7 +46,7 @@ run "ingress_bucket_versioning" {
   }
 
   assert {
-    condition     = aws_s3_bucket_versioning.logs.versioning_configuration[0].status == "Enabled"
+    condition     = aws_s3_bucket_versioning.logs[0].versioning_configuration[0].status == "Enabled"
     error_message = "Logs bucket must have versioning enabled"
   }
 }
@@ -63,9 +63,9 @@ run "bucket_encryption" {
   }
 
   variables {
-    name_prefix              = "test-s3sec"
-    kms_key_arn              = "arn:aws:kms:us-east-1:123456789012:key/test-key-id"
-    ingress_lifecycle_days   = 1
+    name_prefix               = "test-s3sec"
+    kms_key_arn               = "arn:aws:kms:us-east-1:123456789012:key/test-key-id"
+    ingress_lifecycle_days    = 1
     egress_lifecycle_days     = 90
     quarantine_lifecycle_days = 365
   }
@@ -86,7 +86,7 @@ run "bucket_encryption" {
   }
 
   assert {
-    condition     = aws_s3_bucket_server_side_encryption_configuration.logs.rule[0].apply_server_side_encryption_by_default[0].sse_algorithm == "aws:kms"
+    condition     = aws_s3_bucket_server_side_encryption_configuration.logs[0].rule[0].apply_server_side_encryption_by_default[0].sse_algorithm == "aws:kms"
     error_message = "Logs bucket must use KMS encryption"
   }
 
@@ -118,9 +118,9 @@ run "block_public_access" {
   }
 
   variables {
-    name_prefix              = "test-s3sec"
-    kms_key_arn              = "arn:aws:kms:us-east-1:123456789012:key/test-key-id"
-    ingress_lifecycle_days   = 1
+    name_prefix               = "test-s3sec"
+    kms_key_arn               = "arn:aws:kms:us-east-1:123456789012:key/test-key-id"
+    ingress_lifecycle_days    = 1
     egress_lifecycle_days     = 90
     quarantine_lifecycle_days = 365
   }
@@ -190,22 +190,22 @@ run "block_public_access" {
 
   # Logs bucket
   assert {
-    condition     = aws_s3_bucket_public_access_block.logs.block_public_acls == true
+    condition     = aws_s3_bucket_public_access_block.logs[0].block_public_acls == true
     error_message = "Logs bucket must block public ACLs"
   }
 
   assert {
-    condition     = aws_s3_bucket_public_access_block.logs.block_public_policy == true
+    condition     = aws_s3_bucket_public_access_block.logs[0].block_public_policy == true
     error_message = "Logs bucket must block public policy"
   }
 
   assert {
-    condition     = aws_s3_bucket_public_access_block.logs.ignore_public_acls == true
+    condition     = aws_s3_bucket_public_access_block.logs[0].ignore_public_acls == true
     error_message = "Logs bucket must ignore public ACLs"
   }
 
   assert {
-    condition     = aws_s3_bucket_public_access_block.logs.restrict_public_buckets == true
+    condition     = aws_s3_bucket_public_access_block.logs[0].restrict_public_buckets == true
     error_message = "Logs bucket must restrict public buckets"
   }
 }
@@ -222,9 +222,9 @@ run "bucket_ownership" {
   }
 
   variables {
-    name_prefix              = "test-s3sec"
-    kms_key_arn              = "arn:aws:kms:us-east-1:123456789012:key/test-key-id"
-    ingress_lifecycle_days   = 1
+    name_prefix               = "test-s3sec"
+    kms_key_arn               = "arn:aws:kms:us-east-1:123456789012:key/test-key-id"
+    ingress_lifecycle_days    = 1
     egress_lifecycle_days     = 90
     quarantine_lifecycle_days = 365
   }
@@ -245,7 +245,7 @@ run "bucket_ownership" {
   }
 
   assert {
-    condition     = aws_s3_bucket_ownership_controls.logs.rule[0].object_ownership == "BucketOwnerEnforced"
+    condition     = aws_s3_bucket_ownership_controls.logs[0].rule[0].object_ownership == "BucketOwnerEnforced"
     error_message = "Logs bucket must enforce BucketOwnerEnforced"
   }
 }
@@ -262,9 +262,9 @@ run "bucket_logging" {
   }
 
   variables {
-    name_prefix              = "test-s3sec"
-    kms_key_arn              = "arn:aws:kms:us-east-1:123456789012:key/test-key-id"
-    ingress_lifecycle_days   = 1
+    name_prefix               = "test-s3sec"
+    kms_key_arn               = "arn:aws:kms:us-east-1:123456789012:key/test-key-id"
+    ingress_lifecycle_days    = 1
     egress_lifecycle_days     = 90
     quarantine_lifecycle_days = 365
   }
@@ -297,9 +297,9 @@ run "lifecycle_rules" {
   }
 
   variables {
-    name_prefix              = "test-s3sec"
-    kms_key_arn              = "arn:aws:kms:us-east-1:123456789012:key/test-key-id"
-    ingress_lifecycle_days   = 3
+    name_prefix               = "test-s3sec"
+    kms_key_arn               = "arn:aws:kms:us-east-1:123456789012:key/test-key-id"
+    ingress_lifecycle_days    = 3
     egress_lifecycle_days     = 60
     quarantine_lifecycle_days = 180
   }

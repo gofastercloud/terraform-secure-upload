@@ -14,10 +14,10 @@ run "sftp_new_server" {
   command = plan
 
   variables {
-    name_prefix        = "test-sftp"
-    enable_sftp_ingress        = true
-    create_sftp_server = true
-    sftp_endpoint_type = "PUBLIC"
+    name_prefix         = "test-sftp"
+    enable_sftp_ingress = true
+    create_sftp_server  = true
+    sftp_endpoint_type  = "PUBLIC"
     sftp_users = [
       {
         username       = "testuser"
@@ -45,10 +45,10 @@ run "sftp_existing_server" {
   command = plan
 
   variables {
-    name_prefix        = "test-sftp-existing"
-    enable_sftp_ingress        = true
-    create_sftp_server = false
-    sftp_server_id     = "s-1234567890abcdef0"
+    name_prefix         = "test-sftp-existing"
+    enable_sftp_ingress = true
+    create_sftp_server  = false
+    sftp_server_id      = "s-1234567890abcdef0"
     sftp_users = [
       {
         username       = "testuser"
@@ -76,7 +76,7 @@ run "sftp_disabled" {
   command = plan
 
   variables {
-    name_prefix = "test-sftp-off"
+    name_prefix         = "test-sftp-off"
     enable_sftp_ingress = false
   }
 
@@ -99,9 +99,9 @@ run "sftp_egress_enabled" {
   command = plan
 
   variables {
-    name_prefix        = "test-sftp-egress"
-    enable_sftp_ingress        = false
-    enable_sftp_egress = true
+    name_prefix         = "test-sftp-egress"
+    enable_sftp_ingress = false
+    enable_sftp_egress  = true
     sftp_egress_users = [
       {
         username       = "receiver"
@@ -129,9 +129,9 @@ run "sftp_egress_disabled" {
   command = plan
 
   variables {
-    name_prefix        = "test-sftp-egress-off"
-    enable_sftp_ingress        = false
-    enable_sftp_egress = false
+    name_prefix         = "test-sftp-egress-off"
+    enable_sftp_ingress = false
+    enable_sftp_egress  = false
   }
 
   assert {
@@ -153,9 +153,9 @@ run "sftp_multiple_users" {
   command = plan
 
   variables {
-    name_prefix        = "test-sftp-multi"
-    enable_sftp_ingress        = true
-    create_sftp_server = true
+    name_prefix         = "test-sftp-multi"
+    enable_sftp_ingress = true
+    create_sftp_server  = true
     sftp_users = [
       {
         username              = "user-a"

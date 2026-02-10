@@ -7,7 +7,7 @@ provider "aws" {
 }
 
 variables {
-  name_prefix = "test-upload"
+  name_prefix         = "test-upload"
   enable_sftp_ingress = false
 }
 
