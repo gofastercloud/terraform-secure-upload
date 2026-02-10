@@ -39,39 +39,47 @@ A Terraform module that creates a secure file upload pipeline on AWS with automa
                                  │
                                  ▼
                       ┌─────────────────────┐
-                      │  Lambda File Router  │──────┐
-                      └──────┬──────────────┘      │
-                             │                      │
-                    (NO_THREATS_FOUND)               │
-                             │                      │
-                    [scanning enabled?]              │
-                     │              │                │
-                    YES             NO               │
-                     │              │                │
-              ┌──────┴──────┐       │               │
-              │  Prompt     │       │               │
-              │  Injection  │       │               │
-              │  Scanner    │       │               │
-              └──────┬──────┘       │               │
-                     │              │               │
-              [score > threshold?]  │               │
-               │            │       │               │
-              YES           NO      │               │
-               │            │       │               │
-               │     ┌──────┴───────┘               │
-               │     │                              │
-               ▼     ▼                              ▼
-   ┌───────────────────┐   ┌───────────────────┐  ┌──────────┐
-   │  Egress Bucket    │   │Quarantine Bucket   │  │   SNS    │
-   │   (verified)      │   │(threats/injection) │  │  Alert   │
-   └────────┬──────────┘   └───────────────────┘  └──────────┘
-            │
-            ▼ (optional)
-   ┌─────────────────┐
-   │  SFTP Egress    │
-   │ (read-only,     │
-   │  Transfer Family)│
-   └─────────────────┘
+                      │  Lambda File Router  │───────────┐
+                      └──────┬──────────────┘           │
+                             │                           │
+                    (NO_THREATS_FOUND)             (THREATS_FOUND)
+                             │                           │
+                    [scanning enabled?]                   │
+                     │              │                     │
+                    YES             NO                    │
+                     │              │                     │
+              ┌──────┴──────┐       │                    │
+              │  Prompt     │       │                    │
+              │  Injection  │       │                    │
+              │  Scanner    │       │                    │
+              └──────┬──────┘       │                    │
+                     │              │                    │
+              [score > threshold?]  │                    │
+               │            │       │                    │
+              YES           NO──────┤                    │
+               │                    │                    │
+               │                    ▼                    │
+               │       ┌───────────────────┐             │
+               │       │  Egress Bucket    │             │
+               │       │   (verified)      │             │
+               │       └────────┬──────────┘             │
+               │                │                        │
+               │                ▼ (optional)             │
+               │       ┌─────────────────┐               │
+               │       │  SFTP Egress    │               │
+               │       │ (read-only,     │               │
+               │       │  Transfer Family)│              │
+               │       └─────────────────┘               │
+               │                                         │
+               └───────────────┬─────────────────────────┘
+                               │
+                 ┌─────────────┴──────────────┐
+                 │                            │
+                 ▼                            ▼
+    ┌───────────────────┐           ┌──────────┐
+    │Quarantine Bucket   │           │   SNS    │
+    │(threats/injection) │           │  Alert   │
+    └───────────────────┘           └──────────┘
 ```
 
 ## Features
