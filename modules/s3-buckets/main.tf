@@ -213,9 +213,15 @@ data "aws_iam_policy_document" "ssl_only_ingress" {
     }
 
     condition {
-      test     = "StringNotEqualsIfExists"
+      test     = "StringNotEquals"
       variable = "s3:x-amz-server-side-encryption"
       values   = ["aws:kms"]
+    }
+
+    condition {
+      test     = "Null"
+      variable = "s3:x-amz-server-side-encryption"
+      values   = ["false"]
     }
   }
 
@@ -233,9 +239,15 @@ data "aws_iam_policy_document" "ssl_only_ingress" {
     }
 
     condition {
-      test     = "StringNotEqualsIfExists"
+      test     = "StringNotEquals"
       variable = "s3:x-amz-server-side-encryption-aws-kms-key-id"
       values   = [var.kms_key_arn]
+    }
+
+    condition {
+      test     = "Null"
+      variable = "s3:x-amz-server-side-encryption-aws-kms-key-id"
+      values   = ["false"]
     }
   }
 }
@@ -347,9 +359,15 @@ data "aws_iam_policy_document" "ssl_only_egress" {
     }
 
     condition {
-      test     = "StringNotEqualsIfExists"
+      test     = "StringNotEquals"
       variable = "s3:x-amz-server-side-encryption"
       values   = ["aws:kms"]
+    }
+
+    condition {
+      test     = "Null"
+      variable = "s3:x-amz-server-side-encryption"
+      values   = ["false"]
     }
   }
 
@@ -367,9 +385,15 @@ data "aws_iam_policy_document" "ssl_only_egress" {
     }
 
     condition {
-      test     = "StringNotEqualsIfExists"
+      test     = "StringNotEquals"
       variable = "s3:x-amz-server-side-encryption-aws-kms-key-id"
       values   = [var.kms_key_arn]
+    }
+
+    condition {
+      test     = "Null"
+      variable = "s3:x-amz-server-side-encryption-aws-kms-key-id"
+      values   = ["false"]
     }
   }
 }
@@ -501,9 +525,15 @@ data "aws_iam_policy_document" "ssl_only_quarantine" {
     }
 
     condition {
-      test     = "StringNotEqualsIfExists"
+      test     = "StringNotEquals"
       variable = "s3:x-amz-server-side-encryption"
       values   = ["aws:kms"]
+    }
+
+    condition {
+      test     = "Null"
+      variable = "s3:x-amz-server-side-encryption"
+      values   = ["false"]
     }
   }
 
@@ -521,9 +551,15 @@ data "aws_iam_policy_document" "ssl_only_quarantine" {
     }
 
     condition {
-      test     = "StringNotEqualsIfExists"
+      test     = "StringNotEquals"
       variable = "s3:x-amz-server-side-encryption-aws-kms-key-id"
       values   = [var.kms_key_arn]
+    }
+
+    condition {
+      test     = "Null"
+      variable = "s3:x-amz-server-side-encryption-aws-kms-key-id"
+      values   = ["false"]
     }
   }
 }

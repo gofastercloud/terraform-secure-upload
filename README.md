@@ -68,7 +68,7 @@ A Terraform module that creates a secure file upload pipeline on AWS with automa
 - **S3 Object Lock** — optional tamper-proof retention on the quarantine bucket
 - **Least-privilege IAM** — scoped IAM roles for GuardDuty, Lambda, Transfer Family, and SFTP users
 - **TLS enforcement** — bucket policies deny non-HTTPS requests on all buckets
-- **KMS enforcement** — bucket policies use `StringNotEqualsIfExists` to deny uploads that explicitly specify wrong encryption, while allowing AWS services (e.g. Transfer Family) that rely on bucket default SSE-KMS without sending encryption headers
+- **KMS enforcement** — bucket policies use `StringNotEquals` with a `Null` condition guard to deny uploads that explicitly specify wrong encryption, while allowing AWS services (e.g. Transfer Family) that rely on bucket default SSE-KMS without sending encryption headers
 - **Access logging** — dedicated log bucket for S3 server access logs
 - **Lifecycle management** — configurable expiration/transition rules per bucket
 - **Dead letter queue** — SQS DLQ for Lambda invocation failures
@@ -443,7 +443,7 @@ v0.2.1 contains two breaking changes:
 
 1. **Bucket names now include a hashed account ID** — Bucket names changed from `<prefix>-ingress` to `<prefix>-<hash>-ingress` (and similarly for egress, quarantine, logs). This ensures global uniqueness. Existing deployments will see Terraform plan to destroy and recreate all four buckets. **Back up your data before upgrading** or use `terraform state mv` to migrate.
 
-2. **S3 bucket policy condition changed** — `StringNotEquals` was replaced with `StringNotEqualsIfExists` for the `DenyNonKMSEncryption` and `DenyWrongKMSKey` policy statements. This fixes `AccessDenied` errors from AWS services (Transfer Family, GuardDuty, Lambda) that rely on bucket default encryption and don't send explicit encryption headers. This is a policy-only change and does not affect bucket resources.
+2. **S3 bucket policy condition changed** — `DenyNonKMSEncryption` and `DenyWrongKMSKey` statements now use `StringNotEquals` with a `Null` condition guard (see v0.3.0 notes). This correctly allows AWS services that rely on bucket default encryption while denying uploads that explicitly specify wrong encryption. This is a policy-only change and does not affect bucket resources.
 
 ## Contributing
 
