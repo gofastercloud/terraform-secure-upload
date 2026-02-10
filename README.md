@@ -223,7 +223,7 @@ module "secure_upload" {
 | `lambda_runtime` | Lambda runtime identifier for the file-router function. | `string` | `"python3.12"` | no |
 | `lambda_memory_size` | Memory (MB) allocated to the file-router Lambda (128–10240). | `number` | `256` | no |
 | `lambda_timeout` | Timeout (seconds) for the file-router Lambda (1–900). | `number` | `60` | no |
-| `lambda_reserved_concurrency` | Reserved concurrent executions for the file-router Lambda. | `number` | `10` | no |
+| `lambda_reserved_concurrency` | Reserved concurrent executions for the file-router Lambda. Set to `-1` to use unreserved account concurrency. | `number` | `10` | no |
 
 ### Notifications
 
@@ -311,34 +311,58 @@ module "secure_upload" {
 When using an externally managed KMS key (`create_kms_key = false`), your key policy must grant the following permissions to the AWS services used by this module:
 
 ```json
-{
-  "Sid": "AllowSecureUploadServices",
-  "Effect": "Allow",
-  "Principal": {
-    "Service": [
-      "guardduty.amazonaws.com",
-      "lambda.amazonaws.com",
-      "s3.amazonaws.com",
-      "transfer.amazonaws.com",
-      "sns.amazonaws.com"
-    ]
+[
+  {
+    "Sid": "AllowSecureUploadServices",
+    "Effect": "Allow",
+    "Principal": {
+      "Service": [
+        "guardduty.amazonaws.com",
+        "lambda.amazonaws.com",
+        "s3.amazonaws.com",
+        "transfer.amazonaws.com",
+        "sns.amazonaws.com"
+      ]
+    },
+    "Action": [
+      "kms:Decrypt",
+      "kms:Encrypt",
+      "kms:GenerateDataKey",
+      "kms:GenerateDataKeyWithoutPlaintext",
+      "kms:ReEncryptFrom",
+      "kms:ReEncryptTo",
+      "kms:DescribeKey"
+    ],
+    "Resource": "*",
+    "Condition": {
+      "StringEquals": {
+        "aws:SourceAccount": "<YOUR_ACCOUNT_ID>"
+      }
+    }
   },
-  "Action": [
-    "kms:Decrypt",
-    "kms:Encrypt",
-    "kms:GenerateDataKey",
-    "kms:GenerateDataKeyWithoutPlaintext",
-    "kms:ReEncryptFrom",
-    "kms:ReEncryptTo",
-    "kms:DescribeKey"
-  ],
-  "Resource": "*",
-  "Condition": {
-    "StringEquals": {
-      "aws:SourceAccount": "<YOUR_ACCOUNT_ID>"
+  {
+    "Sid": "AllowCloudWatchLogs",
+    "Effect": "Allow",
+    "Principal": {
+      "Service": "logs.<YOUR_REGION>.amazonaws.com"
+    },
+    "Action": [
+      "kms:Decrypt",
+      "kms:Encrypt",
+      "kms:GenerateDataKey",
+      "kms:GenerateDataKeyWithoutPlaintext",
+      "kms:ReEncryptFrom",
+      "kms:ReEncryptTo",
+      "kms:DescribeKey"
+    ],
+    "Resource": "*",
+    "Condition": {
+      "ArnLike": {
+        "kms:EncryptionContext:aws:logs:arn": "arn:aws:logs:<YOUR_REGION>:<YOUR_ACCOUNT_ID>:log-group:*"
+      }
     }
   }
-}
+]
 ```
 
 The module's IAM roles (Lambda, GuardDuty, Transfer Family users) also need `kms:Decrypt` and `kms:GenerateDataKey` grants on the key. These are handled automatically by the module's IAM policies — you only need to ensure the key policy allows the services listed above.

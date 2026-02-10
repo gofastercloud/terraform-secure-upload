@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.2] - 2025-02-10
+
+### Fixed
+
+- **KMS key policy missing CloudWatch Logs service principal** — CloudWatch Logs uses a regional service principal (`logs.<region>.amazonaws.com`) with a `kms:EncryptionContext` condition, which differs from other AWS services. The Lambda log group failed to create with `AccessDeniedException` when KMS encryption was enabled. Added a dedicated `AllowCloudWatchLogs` statement to the KMS key policy.
+
+- **GuardDuty Malware Protection Plan creation failed** — The GuardDuty IAM role was missing `s3:GetBucketNotification`, `s3:PutBucketNotification` (for S3 EventBridge delivery), and `events:PutRule`, `events:PutTargets`, `events:DeleteRule`, `events:RemoveTargets`, `events:DescribeRule` (for EventBridge managed rules). Added both sets of permissions.
+
+- **Transfer Family user creation failed with trailing slash** — Home directory mapping targets included a trailing `/` (e.g. `/bucket/uploads/dave/`), which Transfer Family rejects. Fixed with `trimsuffix()`.
+
+### Changed
+
+- **`lambda_reserved_concurrency` now accepts `-1`** — Setting `-1` uses unreserved account concurrency, which is necessary for accounts with low concurrency limits where reserving even 10 would drop below the 50-unreserved minimum.
+
 ## [0.2.1] - 2025-02-10
 
 ### Fixed

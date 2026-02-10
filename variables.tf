@@ -324,13 +324,13 @@ variable "lambda_timeout" {
 }
 
 variable "lambda_reserved_concurrency" {
-  description = "Reserved concurrent executions for the file-router Lambda function."
+  description = "Reserved concurrent executions for the file-router Lambda function. Set to -1 to use unreserved account concurrency."
   type        = number
   default     = 10
 
   validation {
-    condition     = var.lambda_reserved_concurrency >= 1
-    error_message = "lambda_reserved_concurrency must be at least 1."
+    condition     = var.lambda_reserved_concurrency == -1 || var.lambda_reserved_concurrency >= 1
+    error_message = "lambda_reserved_concurrency must be -1 (unreserved) or at least 1."
   }
 }
 
