@@ -203,25 +203,13 @@ Creates incidents in ServiceNow when malware is detected. Uses the ServiceNow RE
 ### Prerequisites
 
 1. **Note your ServiceNow instance URL** (e.g. `https://mycompany.service-now.com`).
-2. **Create a Secrets Manager secret** containing ServiceNow credentials as JSON:
+2. **Prepare ServiceNow credentials as a JSON string:**
 
    ```json
-   {
-     "username": "api_user",
-     "password": "api_password"
-   }
+   {"username": "api_user", "password": "api_password"}
    ```
 
    We recommend creating a dedicated ServiceNow service account with permission to create incidents via the REST API (`/api/now/table/incident`).
-
-   ```bash
-   aws secretsmanager create-secret \
-     --name "secure-upload/servicenow-credentials" \
-     --secret-string '{"username":"api_user","password":"api_password"}' \
-     --kms-key-id alias/your-kms-key
-   ```
-
-3. **Note the secret ARN** from the output.
 
 ### Configuration
 
@@ -231,22 +219,25 @@ module "secure_upload" {
 
   # ... core configuration ...
 
-  enable_servicenow_integration      = true
-  servicenow_instance_url            = "https://mycompany.service-now.com"
-  servicenow_credentials_secret_arn  = "arn:aws:secretsmanager:us-east-1:123456789012:secret:secure-upload/servicenow-credentials-AbCdEf"
+  enable_servicenow_integration = true
+  servicenow_instance_url       = "https://mycompany.service-now.com"
+  servicenow_credentials        = "{\"username\":\"api_user\",\"password\":\"api_password\"}"
 }
 ```
 
+> **Note:** The `servicenow_credentials` variable is marked `sensitive` in Terraform. The credentials are stored as a SecureString in SSM Parameter Store (encrypted with the module's KMS key) and fetched by the Lambda at runtime — they never appear as plaintext environment variables.
+
 ### What Gets Created
 
+- An SSM Parameter Store SecureString (`/<name_prefix>/secure-upload/servicenow-credentials`) containing the credentials, encrypted with the module's KMS key
 - A Lambda function (`webhook_forwarder`) subscribed to the SNS alert topic (shared with Discord if both are enabled)
-- An IAM role for the Lambda with permissions for CloudWatch Logs, KMS, and Secrets Manager (scoped to the provided secret ARN)
+- An IAM role for the Lambda with permissions for CloudWatch Logs, KMS, and SSM (scoped to the parameter)
 - A CloudWatch Log Group for the Lambda
 - An SNS topic subscription and invoke permission
 
-### Secret ARN Validation
+### Credentials Validation
 
-The module validates that `servicenow_credentials_secret_arn` is a valid Secrets Manager ARN (starts with `arn:aws:secretsmanager:`).
+The module validates that `servicenow_credentials` is a valid JSON string when `enable_servicenow_integration` is `true`.
 
 ### Incident Fields
 
@@ -283,9 +274,9 @@ module "secure_upload" {
   discord_webhook_url        = "https://discord.com/api/webhooks/XXXX/XXXX"
 
   # ServiceNow
-  enable_servicenow_integration     = true
-  servicenow_instance_url           = "https://mycompany.service-now.com"
-  servicenow_credentials_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret-AbCdEf"
+  enable_servicenow_integration = true
+  servicenow_instance_url       = "https://mycompany.service-now.com"
+  servicenow_credentials        = var.servicenow_credentials  # JSON: {"username":"...","password":"..."}
 }
 ```
 

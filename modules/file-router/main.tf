@@ -139,6 +139,91 @@ resource "aws_sns_topic_subscription" "email" {
 }
 
 ################################################################################
+# Egress Notification SNS Topic (optional)
+################################################################################
+
+resource "aws_sns_topic" "egress_notifications" {
+  count = var.enable_egress_notifications ? 1 : 0
+
+  name              = "${var.name_prefix}-egress-notifications"
+  kms_master_key_id = var.kms_key_arn
+  tags              = var.tags
+}
+
+resource "aws_sns_topic_policy" "egress_notifications" {
+  count = var.enable_egress_notifications ? 1 : 0
+
+  arn = aws_sns_topic.egress_notifications[0].arn
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "AllowAccountOnly"
+        Effect    = "Allow"
+        Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" }
+        Action = [
+          "SNS:Publish",
+          "SNS:Subscribe",
+          "SNS:GetTopicAttributes",
+        ]
+        Resource = aws_sns_topic.egress_notifications[0].arn
+      }
+    ]
+  })
+}
+
+resource "aws_sns_topic_subscription" "egress_email" {
+  for_each = var.enable_egress_notifications ? toset(var.egress_notification_emails) : toset([])
+
+  topic_arn = aws_sns_topic.egress_notifications[0].arn
+  protocol  = "email"
+  endpoint  = each.value
+}
+
+################################################################################
+# Audit Trail DynamoDB Table (optional)
+################################################################################
+
+resource "aws_dynamodb_table" "audit_trail" {
+  count = var.enable_audit_trail ? 1 : 0
+
+  name         = "${var.name_prefix}-audit-trail"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "PK"
+  range_key    = "SK"
+
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+
+  attribute {
+    name = "SK"
+    type = "S"
+  }
+
+  dynamic "ttl" {
+    for_each = var.audit_trail_retention_days > 0 ? [1] : []
+    content {
+      attribute_name = "expires_at"
+      enabled        = true
+    }
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = var.kms_key_arn
+  }
+
+  tags = var.tags
+}
+
+################################################################################
 # IAM Role for Lambda
 ################################################################################
 
@@ -232,6 +317,32 @@ resource "aws_iam_role_policy" "file_router" {
           Resource = "${aws_cloudwatch_log_group.file_router.arn}:*"
         },
       ],
+      var.enable_egress_notifications ? [
+        {
+          Sid      = "EgressSNSPublish"
+          Effect   = "Allow"
+          Action   = "sns:Publish"
+          Resource = aws_sns_topic.egress_notifications[0].arn
+        },
+      ] : [],
+      var.enable_audit_trail ? [
+        {
+          Sid    = "AuditTrailWrite"
+          Effect = "Allow"
+          Action = [
+            "dynamodb:PutItem",
+          ]
+          Resource = aws_dynamodb_table.audit_trail[0].arn
+        },
+      ] : [],
+      var.virustotal_scanner_function_arn != null ? [
+        {
+          Sid      = "InvokeVirusTotalScanner"
+          Effect   = "Allow"
+          Action   = "lambda:InvokeFunction"
+          Resource = var.virustotal_scanner_function_arn
+        },
+      ] : [],
       var.prompt_injection_scanner_function_arn != null ? [
         {
           Sid      = "InvokeScannerLambda"
@@ -276,6 +387,17 @@ resource "aws_lambda_function" "file_router" {
         SNS_TOPIC_ARN     = aws_sns_topic.malware_alerts.arn
         KMS_KEY_ARN       = var.kms_key_arn
       },
+      var.enable_egress_notifications ? {
+        EGRESS_SNS_TOPIC_ARN = aws_sns_topic.egress_notifications[0].arn
+      } : {},
+      var.enable_audit_trail ? {
+        AUDIT_TABLE_NAME     = aws_dynamodb_table.audit_trail[0].name
+        AUDIT_RETENTION_DAYS = tostring(var.audit_trail_retention_days)
+      } : {},
+      var.virustotal_scanner_function_arn != null ? {
+        VIRUSTOTAL_FUNCTION_NAME = regex("function:(.+)$", var.virustotal_scanner_function_arn)[0]
+        VIRUSTOTAL_THRESHOLD     = tostring(var.virustotal_threshold)
+      } : {},
       var.prompt_injection_scanner_function_arn != null ? {
         SCANNER_FUNCTION_NAME      = regex("function:(.+)$", var.prompt_injection_scanner_function_arn)[0]
         PROMPT_INJECTION_THRESHOLD = tostring(var.prompt_injection_threshold)
@@ -421,6 +543,48 @@ resource "aws_cloudwatch_log_metric_filter" "prompt_injection_detections" {
 
   metric_transformation {
     name      = "PromptInjectionDetections"
+    namespace = local.dashboard_namespace
+    value     = "1"
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "virustotal_scans" {
+  count = var.enable_cloudwatch_dashboard ? 1 : 0
+
+  name           = "${var.name_prefix}-virustotal-scans"
+  log_group_name = aws_cloudwatch_log_group.file_router.name
+  pattern        = "\"VirusTotal scan result\""
+
+  metric_transformation {
+    name      = "VirusTotalScans"
+    namespace = local.dashboard_namespace
+    value     = "1"
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "virustotal_detections" {
+  count = var.enable_cloudwatch_dashboard ? 1 : 0
+
+  name           = "${var.name_prefix}-virustotal-detections"
+  log_group_name = aws_cloudwatch_log_group.file_router.name
+  pattern        = "\"VirusTotal malicious\""
+
+  metric_transformation {
+    name      = "VirusTotalDetections"
+    namespace = local.dashboard_namespace
+    value     = "1"
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "egress_notifications_sent" {
+  count = var.enable_cloudwatch_dashboard ? 1 : 0
+
+  name           = "${var.name_prefix}-egress-notifications-sent"
+  log_group_name = aws_cloudwatch_log_group.file_router.name
+  pattern        = "\"Egress notification sent\""
+
+  metric_transformation {
+    name      = "EgressNotificationsSent"
     namespace = local.dashboard_namespace
     value     = "1"
   }
@@ -577,11 +741,72 @@ resource "aws_cloudwatch_dashboard" "pipeline" {
           }
         },
       ] : [],
+      var.virustotal_scanner_function_name != null ? [
+        {
+          type   = "metric"
+          x      = 0
+          y      = 24
+          width  = 12
+          height = 6
+          properties = {
+            title  = "VirusTotal Scan Outcomes"
+            region = data.aws_region.current.name
+            metrics = [
+              [local.dashboard_namespace, "VirusTotalScans", { label = "Files Scanned", color = "#1f77b4" }],
+              [local.dashboard_namespace, "VirusTotalDetections", { label = "Malicious Detected", color = "#d62728" }],
+            ]
+            view    = "timeSeries"
+            stacked = false
+            period  = 300
+            stat    = "Sum"
+          }
+        },
+      ] : [],
+      var.virustotal_scanner_function_name != null ? [
+        {
+          type   = "metric"
+          x      = 12
+          y      = 24
+          width  = 12
+          height = 6
+          properties = {
+            title  = "VirusTotal Summary"
+            region = data.aws_region.current.name
+            metrics = [
+              [local.dashboard_namespace, "VirusTotalScans", { label = "Files Scanned", color = "#1f77b4" }],
+              [local.dashboard_namespace, "VirusTotalDetections", { label = "Malicious Detected", color = "#d62728" }],
+            ]
+            view                 = "singleValue"
+            setPeriodToTimeRange = true
+            stat                 = "Sum"
+          }
+        },
+      ] : [],
+      var.enable_egress_notifications ? [
+        {
+          type   = "metric"
+          x      = 0
+          y      = 30
+          width  = 12
+          height = 6
+          properties = {
+            title  = "Egress Notifications"
+            region = data.aws_region.current.name
+            metrics = [
+              [local.dashboard_namespace, "EgressNotificationsSent", { label = "Notifications Sent", color = "#2ca02c" }],
+            ]
+            view    = "timeSeries"
+            stacked = false
+            period  = 300
+            stat    = "Sum"
+          }
+        },
+      ] : [],
       [
         {
           type   = "metric"
           x      = 0
-          y      = var.prompt_injection_scanner_function_name != null ? 24 : 12
+          y      = 36
           width  = 8
           height = 6
           properties = {
@@ -600,7 +825,7 @@ resource "aws_cloudwatch_dashboard" "pipeline" {
         {
           type   = "metric"
           x      = 8
-          y      = var.prompt_injection_scanner_function_name != null ? 24 : 12
+          y      = 36
           width  = 8
           height = 6
           properties = {
@@ -619,7 +844,7 @@ resource "aws_cloudwatch_dashboard" "pipeline" {
         {
           type   = "metric"
           x      = 16
-          y      = var.prompt_injection_scanner_function_name != null ? 24 : 12
+          y      = 36
           width  = 8
           height = 6
           properties = {

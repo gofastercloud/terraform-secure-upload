@@ -21,73 +21,84 @@ A Terraform module that creates a secure file upload pipeline on AWS with automa
           └─────────────┘        │
                                  ▼
                       ┌─────────────────────┐
-                      │   Ingress Bucket     │
+                      │   Ingress Bucket     │ ── [Audit Trail]
                       │  (KMS encrypted)     │
                       └──────────┬──────────┘
                                  │
-                                 ▼
-                      ┌─────────────────────┐
-                      │  GuardDuty Malware   │
-                      │  Protection Scan     │
-                      └──────────┬──────────┘
-                                 │
-                                 ▼
-                      ┌─────────────────────┐
-                      │  EventBridge Rule    │
-                      │  (scan result)       │
-                      └──────────┬──────────┘
-                                 │
-                                 ▼
-                      ┌─────────────────────┐
-                      │  Lambda File Router  │───────────┐
-                      └──────┬──────────────┘           │
-                             │                           │
-                    (NO_THREATS_FOUND)             (THREATS_FOUND)
-                             │                           │
-                    [scanning enabled?]                   │
-                     │              │                     │
-                    YES             NO                    │
-                     │              │                     │
-              ┌──────┴──────┐       │                    │
-              │  Prompt     │       │                    │
-              │  Injection  │       │                    │
-              │  Scanner    │       │                    │
-              └──────┬──────┘       │                    │
-                     │              │                    │
-              [score > threshold?]  │                    │
-               │            │       │                    │
-              YES           NO──────┤                    │
-               │                    │                    │
-               │                    ▼                    │
-               │       ┌───────────────────┐             │
-               │       │  Egress Bucket    │             │
-               │       │   (verified)      │             │
-               │       └────────┬──────────┘             │
-               │                │                        │
-               │                ▼ (optional)             │
-               │       ┌─────────────────┐               │
-               │       │  SFTP Egress    │               │
-               │       │ (read-only,     │               │
-               │       │  Transfer Family)│              │
-               │       └─────────────────┘               │
-               │                                         │
-               └───────────────┬─────────────────────────┘
-                               │
-                 ┌─────────────┴──────────────┐
-                 │                            │
-                 ▼                            ▼
-    ┌───────────────────┐           ┌──────────┐
-    │Quarantine Bucket   │           │   SNS    │
-    │(threats/injection) │           │  Alert   │
-    └───────────────────┘           └──────────┘
+                    ┌────────────┴────────────┐
+                    │                         │
+                    ▼                         ▼
+         ┌─────────────────────┐   ┌──────────────────┐
+         │  GuardDuty Malware   │   │ VT Hash Lookup   │
+         │  Protection Scan     │   │ (EventBridge,    │
+         │  (seconds-minutes)   │   │  tags object)    │
+         └──────────┬──────────┘   └──────────────────┘
+                    │
+                    ▼
+         ┌─────────────────────┐
+         │  EventBridge Rule    │
+         │  (scan result)       │
+         └──────────┬──────────┘
+                    │
+                    ▼
+         ┌─────────────────────┐
+         │  Lambda File Router  │───────────┐
+         │  (reads VT tags)     │           │
+         └──────┬──────────────┘           │
+                │                           │
+       (NO_THREATS_FOUND)             (THREATS_FOUND)
+                │                           │
+       [VT malicious?]                      │
+         │          │                       │
+        YES         NO                      │
+         │          │                       │
+         │  [PI enabled?]                   │
+         │   │          │                   │
+         │  YES         NO                  │
+         │   │          │                   │
+         │ ┌─┴────────┐ │                   │
+         │ │  Prompt   │ │ ── [Audit Trail] │
+         │ │ Injection │ │                  │
+         │ │  Scanner  │ │                  │
+         │ └──┬───┬───┘  │                  │
+         │    │   │       │                  │
+         │  Safe  Risky   │                  │
+         │    │   │       │                  │
+         │    │   └───────┤                  │
+         │    │           │                  │
+         │    ▼           │                  │
+         │ ┌───────────────────┐             │
+         │ │  Egress Bucket    │             │
+         │ │   (verified)      │             │
+         │ └────────┬──────────┘             │
+         │          │   │                    │
+         │ [Audit Trail] │                   │
+         │          │   │                    │
+         │ ┌────────┴───┴──────┐             │
+         │ │ Egress SNS (opt)  │             │
+         │ │ SFTP Egress (opt) │             │
+         │ └──────────────────┘              │
+         │                                   │
+         └──────────┬────────────────────────┘
+                    │
+      ┌─────────────┴──────────────┐
+      │                            │
+      ▼                            ▼
+  ┌───────────────────┐   ┌──────────┐
+  │Quarantine Bucket   │   │   SNS    │
+  │(threats/VT/inject) │   │  Alert   │
+  └───────────────────┘   └──────────┘
 ```
 
 ## Features
 
-- **Prompt injection scanning** — optional AI-powered scanning of uploaded documents for prompt injection attacks using an ONNX model, with configurable score threshold and support for PDF, DOCX, PPTX, and plain text formats
 - **Automatic malware scanning** — GuardDuty Malware Protection scans every object uploaded to the ingress bucket
+- **VirusTotal hash lookup** — optional SHA-256 hash check against the VirusTotal API, running in parallel with GuardDuty via EventBridge. Results are stored as S3 object tags and read by the file router when making routing decisions. Files with detections above a configurable threshold are quarantined.
+- **Prompt injection scanning** — optional AI-powered scanning of uploaded documents for prompt injection attacks using an ONNX model, with configurable score threshold and support for PDF, DOCX, PPTX, and plain text formats
 - **Automated file routing** — Lambda moves verified files to the egress bucket and infected files to quarantine
 - **SNS alerting** — email notifications when malware is detected
+- **Egress notifications** — optional SNS topic fires when clean files reach the egress bucket, enabling downstream automation
+- **File processing audit trail** — optional DynamoDB table records every file at each pipeline stage (received, GuardDuty, VirusTotal, prompt injection, routed) with configurable TTL retention
 - **SFTP upload support** — optional AWS Transfer Family server with per-user home directories
 - **SFTP egress** — optional read-only SFTP endpoint for pulling verified files from the egress bucket
 - **KMS encryption** — all buckets encrypted with a shared KMS key (BYO or auto-created)
@@ -99,7 +110,7 @@ A Terraform module that creates a secure file upload pipeline on AWS with automa
 - **Lifecycle management** — configurable expiration/transition rules per bucket
 - **Dead letter queue** — SQS DLQ for Lambda invocation failures
 - **Lambda error alarm** — CloudWatch alarm on Lambda invocation errors (separate from DLQ), firing to the SNS alert topic
-- **CloudWatch dashboard** — optional pipeline dashboard with metric filters for file routing outcomes, Lambda health, DLQ depth, and S3 bucket metrics
+- **CloudWatch dashboard** — optional pipeline dashboard with metric filters for file routing outcomes, VirusTotal scans, prompt injection, egress notifications, Lambda health, DLQ depth, and S3 bucket metrics
 - **Deletion protection** — `prevent_destroy` lifecycle on the KMS key and quarantine bucket to guard against accidental data loss
 - **Chat & incident integrations** — optional integrations for Slack, Microsoft Teams, PagerDuty, VictorOps, Discord, and ServiceNow (see [integrations.md](integrations.md))
 
@@ -263,6 +274,28 @@ module "secure_upload" {
 | `prompt_injection_reserved_concurrency` | Reserved concurrent executions for the scanner Lambda. Set to `-1` for unreserved. | `number` | `5` | no |
 | `prompt_injection_image_uri` | URI of a pre-built container image for the scanner. When set, skips ECR repo creation and image build. | `string` | `null` | no |
 
+### VirusTotal Hash Lookup
+
+| Name | Description | Type | Default | Required |
+|---|---|---|---|---|
+| `enable_virustotal_scanning` | Enable VirusTotal hash lookup scanning. Files that pass GuardDuty are checked against the VirusTotal API. | `bool` | `false` | no |
+| `virustotal_api_key` | VirusTotal API key. Required when `enable_virustotal_scanning` is `true`. Stored as SSM SecureString. | `string` | `null` | no |
+| `virustotal_threshold` | Number of positive detections at or above which a file is quarantined. | `number` | `3` | no |
+
+### Egress Notifications
+
+| Name | Description | Type | Default | Required |
+|---|---|---|---|---|
+| `enable_egress_notifications` | Enable SNS notifications when clean files reach the egress bucket. | `bool` | `false` | no |
+| `egress_notification_emails` | Email addresses subscribed to the egress notification SNS topic. | `list(string)` | `[]` | no |
+
+### Audit Trail
+
+| Name | Description | Type | Default | Required |
+|---|---|---|---|---|
+| `enable_audit_trail` | Enable a DynamoDB audit trail recording every file at each pipeline stage. | `bool` | `false` | no |
+| `audit_trail_retention_days` | Days to retain audit trail records. `0` retains forever. | `number` | `365` | no |
+
 ### Notifications
 
 | Name | Description | Type | Default | Required |
@@ -317,6 +350,10 @@ module "secure_upload" {
 | `dlq_arn` | ARN of the file-router Lambda dead letter queue. |
 | `eventbridge_rule_arn` | ARN of the EventBridge rule for GuardDuty scan results. |
 | `cloudwatch_dashboard_arn` | ARN of the CloudWatch pipeline dashboard (null when disabled). |
+| `egress_sns_topic_arn` | ARN of the egress notification SNS topic (null when disabled). |
+| `audit_trail_table_arn` | ARN of the audit trail DynamoDB table (null when disabled). |
+| `audit_trail_table_name` | Name of the audit trail DynamoDB table (null when disabled). |
+| `virustotal_scanner_function_arn` | ARN of the VirusTotal scanner Lambda function (null when disabled). |
 | `prompt_injection_scanner_function_arn` | ARN of the prompt injection scanner Lambda function (null when disabled). |
 | `prompt_injection_scanner_ecr_repository_url` | URL of the ECR repository for the scanner image (null when disabled or BYO image). |
 
@@ -333,18 +370,22 @@ module "secure_upload" {
 
 1. **Upload** — Files are uploaded to the ingress bucket, either via direct S3 PutObject or through the optional SFTP endpoint (AWS Transfer Family).
 
-2. **Scan** — GuardDuty Malware Protection for S3 automatically scans every new object in the ingress bucket and tags it with the scan result.
+2. **Scan** — GuardDuty Malware Protection for S3 automatically scans every new object in the ingress bucket. If VirusTotal scanning is enabled, an EventBridge rule also triggers the VT scanner Lambda in parallel, which checks the file's SHA-256 hash and writes results as S3 object tags.
 
-3. **Event** — When the scan completes, GuardDuty emits a `GuardDuty Malware Protection Object Scan Result` event to EventBridge.
+3. **Event** — When GuardDuty completes, it emits a `GuardDuty Malware Protection Object Scan Result` event to EventBridge.
 
 4. **Route** — An EventBridge rule invokes the file-router Lambda function with the scan result:
-   - **NO_THREATS_FOUND** — if prompt injection scanning is enabled, the file router invokes the scanner Lambda synchronously. If the score exceeds the threshold, the file is quarantined. Otherwise (or if scanning is disabled), the file is copied to the egress bucket and deleted from ingress.
+   - **NO_THREATS_FOUND** — if VirusTotal scanning is enabled, the file router reads VT results from S3 object tags (written earlier by the parallel VT scan). If VT positives meet the threshold, the file is quarantined. Next, if prompt injection scanning is enabled, the file router invokes the scanner Lambda synchronously. If the score exceeds the threshold, the file is quarantined. Otherwise (or if scanning is disabled), the file is copied to the egress bucket and deleted from ingress.
    - **THREATS_FOUND** — the file is copied to the quarantine bucket, deleted from ingress, and an SNS notification is published with threat details.
    - **Other results** (e.g., `UNSUPPORTED`, `ACCESS_DENIED`) — the file is left in ingress for manual review.
 
 5. **Alert** — If threats are detected, subscribed email addresses receive a JSON-formatted alert with the file key, threat names, and timestamp.
 
-6. **Egress** (optional) — Verified files in the egress bucket can be pulled by downstream receivers via a read-only SFTP endpoint. Egress users have `GetObject` and `ListBucket` permissions only (no `PutObject`).
+6. **Egress notification** (optional) — When a clean file reaches the egress bucket, an SNS notification is published with file details and scan results.
+
+7. **Audit trail** (optional) — Every file is logged at each pipeline stage (received, GuardDuty, VirusTotal, prompt injection, routed) in a DynamoDB table with configurable TTL retention.
+
+8. **Egress** (optional) — Verified files in the egress bucket can be pulled by downstream receivers via a read-only SFTP endpoint. Egress users have `GetObject` and `ListBucket` permissions only (no `PutObject`).
 
 ## External KMS Key
 

@@ -27,3 +27,18 @@ output "cloudwatch_dashboard_arn" {
   description = "ARN of the CloudWatch dashboard (null when disabled)"
   value       = var.enable_cloudwatch_dashboard ? aws_cloudwatch_dashboard.pipeline[0].dashboard_arn : null
 }
+
+output "egress_sns_topic_arn" {
+  description = "ARN of the egress notification SNS topic (null when disabled)"
+  value       = var.enable_egress_notifications ? aws_sns_topic.egress_notifications[0].arn : null
+}
+
+output "audit_trail_table_arn" {
+  description = "ARN of the audit trail DynamoDB table (null when disabled)"
+  value       = var.enable_audit_trail ? aws_dynamodb_table.audit_trail[0].arn : null
+}
+
+output "audit_trail_table_name" {
+  description = "Name of the audit trail DynamoDB table (null when disabled)"
+  value       = var.enable_audit_trail ? aws_dynamodb_table.audit_trail[0].name : null
+}

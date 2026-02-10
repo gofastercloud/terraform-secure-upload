@@ -92,6 +92,48 @@ variable "enable_cloudwatch_dashboard" {
   default     = false
 }
 
+variable "enable_egress_notifications" {
+  description = "Enable SNS notifications when clean files are delivered to the egress bucket."
+  type        = bool
+  default     = false
+}
+
+variable "egress_notification_emails" {
+  description = "Email addresses subscribed to the egress notification SNS topic."
+  type        = list(string)
+  default     = []
+}
+
+variable "enable_audit_trail" {
+  description = "Enable a DynamoDB audit trail that records every file at each pipeline stage."
+  type        = bool
+  default     = false
+}
+
+variable "audit_trail_retention_days" {
+  description = "Number of days to retain audit trail records. Set to 0 to retain forever."
+  type        = number
+  default     = 365
+}
+
+variable "virustotal_scanner_function_arn" {
+  description = "ARN of the VirusTotal scanner Lambda function. When non-null, the file router invokes it synchronously for files that pass GuardDuty scanning."
+  type        = string
+  default     = null
+}
+
+variable "virustotal_scanner_function_name" {
+  description = "Name of the VirusTotal scanner Lambda function (for dashboard metrics). Null when scanning is disabled."
+  type        = string
+  default     = null
+}
+
+variable "virustotal_threshold" {
+  description = "Number of VirusTotal positives at or above which a file is quarantined."
+  type        = number
+  default     = 3
+}
+
 variable "prompt_injection_scanner_function_arn" {
   description = "ARN of the prompt injection scanner Lambda function. When non-null, the file router invokes it synchronously for files that pass malware scanning."
   type        = string

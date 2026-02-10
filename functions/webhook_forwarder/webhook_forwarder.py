@@ -20,7 +20,7 @@ logger.setLevel(logging.INFO)
 # ---------------------------------------------------------------------------
 DISCORD_WEBHOOK_SSM_PARAMETER = os.environ.get("DISCORD_WEBHOOK_SSM_PARAMETER")
 SERVICENOW_INSTANCE_URL = os.environ.get("SERVICENOW_INSTANCE_URL")
-SERVICENOW_CREDENTIALS_SECRET_ARN = os.environ.get("SERVICENOW_CREDENTIALS_SECRET_ARN")
+SERVICENOW_CREDENTIALS_SSM_PARAMETER = os.environ.get("SERVICENOW_CREDENTIALS_SSM_PARAMETER")
 
 # ---------------------------------------------------------------------------
 # Cached secrets (fetched once at init, reused across warm invocations)
@@ -51,22 +51,24 @@ def _get_discord_webhook_url():
 
 
 def _get_servicenow_credentials():
-    """Retrieve ServiceNow credentials from AWS Secrets Manager (cached)."""
+    """Retrieve ServiceNow credentials from SSM Parameter Store (cached)."""
     global _servicenow_username, _servicenow_password
     if _servicenow_username is not None:
         return _servicenow_username, _servicenow_password
 
-    if not SERVICENOW_CREDENTIALS_SECRET_ARN:
-        raise ValueError("SERVICENOW_CREDENTIALS_SECRET_ARN is not set")
+    if not SERVICENOW_CREDENTIALS_SSM_PARAMETER:
+        raise ValueError("SERVICENOW_CREDENTIALS_SSM_PARAMETER is not set")
 
     import boto3
 
-    client = boto3.client("secretsmanager")
-    resp = client.get_secret_value(SecretId=SERVICENOW_CREDENTIALS_SECRET_ARN)
-    secret = json.loads(resp["SecretString"])
+    client = boto3.client("ssm")
+    resp = client.get_parameter(
+        Name=SERVICENOW_CREDENTIALS_SSM_PARAMETER, WithDecryption=True
+    )
+    secret = json.loads(resp["Parameter"]["Value"])
     _servicenow_username = secret["username"]
     _servicenow_password = secret["password"]
-    logger.info("ServiceNow credentials retrieved from Secrets Manager")
+    logger.info("ServiceNow credentials retrieved from SSM Parameter Store")
     return _servicenow_username, _servicenow_password
 
 

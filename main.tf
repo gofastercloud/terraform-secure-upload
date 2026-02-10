@@ -165,15 +165,203 @@ module "file_router" {
   quarantine_bucket_arn       = module.s3_buckets.quarantine_bucket_arn
   lambda_runtime              = var.lambda_runtime
   lambda_memory_size          = var.lambda_memory_size
-  lambda_timeout              = var.enable_prompt_injection_scanning ? max(var.lambda_timeout, var.prompt_injection_timeout + 30) : var.lambda_timeout
+  lambda_timeout              = max(var.lambda_timeout, var.enable_prompt_injection_scanning ? var.prompt_injection_timeout + 30 : 0, var.enable_virustotal_scanning ? 90 : 0)
   lambda_reserved_concurrency = var.lambda_reserved_concurrency
   sns_subscription_emails     = var.sns_subscription_emails
   log_retention_days          = var.log_retention_days
   enable_cloudwatch_dashboard = var.enable_cloudwatch_dashboard
 
+  enable_egress_notifications = var.enable_egress_notifications
+  egress_notification_emails  = var.egress_notification_emails
+
+  enable_audit_trail         = var.enable_audit_trail
+  audit_trail_retention_days = var.audit_trail_retention_days
+
+  virustotal_scanner_function_arn  = var.enable_virustotal_scanning ? aws_lambda_function.virustotal_scanner[0].arn : null
+  virustotal_scanner_function_name = var.enable_virustotal_scanning ? aws_lambda_function.virustotal_scanner[0].function_name : null
+  virustotal_threshold             = var.virustotal_threshold
+
   prompt_injection_scanner_function_arn  = var.enable_prompt_injection_scanning ? aws_lambda_function.prompt_injection_scanner[0].arn : null
   prompt_injection_scanner_function_name = var.enable_prompt_injection_scanning ? aws_lambda_function.prompt_injection_scanner[0].function_name : null
   prompt_injection_threshold             = var.prompt_injection_threshold
+}
+
+################################################################################
+# VirusTotal Scanner (conditional)
+################################################################################
+
+resource "aws_ssm_parameter" "virustotal_api_key" {
+  count = var.enable_virustotal_scanning ? 1 : 0
+
+  name   = "/${var.name_prefix}/secure-upload/virustotal-api-key"
+  type   = "SecureString"
+  key_id = local.kms_key_arn
+  value  = var.virustotal_api_key
+
+  tags = local.default_tags
+}
+
+data "archive_file" "virustotal_scanner" {
+  count = var.enable_virustotal_scanning ? 1 : 0
+
+  type        = "zip"
+  source_file = "${path.module}/lambda/virustotal_scanner.py"
+  output_path = "${path.module}/.build/virustotal_scanner.zip"
+}
+
+resource "aws_cloudwatch_log_group" "virustotal_scanner" {
+  count = var.enable_virustotal_scanning ? 1 : 0
+
+  name              = "/aws/lambda/${var.name_prefix}-virustotal-scanner"
+  retention_in_days = var.log_retention_days
+  kms_key_id        = local.kms_key_arn
+  tags              = local.default_tags
+}
+
+resource "aws_iam_role" "virustotal_scanner" {
+  count = var.enable_virustotal_scanning ? 1 : 0
+
+  name = "${var.name_prefix}-virustotal-scanner"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { Service = "lambda.amazonaws.com" }
+        Action    = "sts:AssumeRole"
+        Condition = {
+          StringEquals = {
+            "aws:SourceAccount" = local.account_id
+          }
+        }
+      }
+    ]
+  })
+
+  tags = local.default_tags
+}
+
+resource "aws_iam_role_policy" "virustotal_scanner" {
+  count = var.enable_virustotal_scanning ? 1 : 0
+
+  name = "${var.name_prefix}-virustotal-scanner"
+  role = aws_iam_role.virustotal_scanner[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "IngressBucketRead"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObjectTagging",
+        ]
+        Resource = "${module.s3_buckets.ingress_bucket_arn}/*"
+      },
+      {
+        Sid    = "KMSDecrypt"
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+        ]
+        Resource = local.kms_key_arn
+      },
+      {
+        Sid    = "SSMGetVirusTotalKey"
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+        ]
+        Resource = aws_ssm_parameter.virustotal_api_key[0].arn
+      },
+      {
+        Sid    = "CloudWatchLogs"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+        ]
+        Resource = "${aws_cloudwatch_log_group.virustotal_scanner[0].arn}:*"
+      },
+    ]
+  })
+}
+
+resource "aws_lambda_function" "virustotal_scanner" {
+  count = var.enable_virustotal_scanning ? 1 : 0
+
+  function_name    = "${var.name_prefix}-virustotal-scanner"
+  description      = "Checks uploaded file SHA-256 hashes against the VirusTotal API"
+  filename         = data.archive_file.virustotal_scanner[0].output_path
+  source_code_hash = data.archive_file.virustotal_scanner[0].output_base64sha256
+  handler          = "virustotal_scanner.handler"
+  runtime          = var.lambda_runtime
+  role             = aws_iam_role.virustotal_scanner[0].arn
+  memory_size      = 256
+  timeout          = 60
+
+  kms_key_arn = local.kms_key_arn
+
+  environment {
+    variables = {
+      VIRUSTOTAL_API_KEY_SSM_PARAMETER = aws_ssm_parameter.virustotal_api_key[0].name
+      VIRUSTOTAL_THRESHOLD             = tostring(var.virustotal_threshold)
+    }
+  }
+
+  depends_on = [
+    aws_iam_role_policy.virustotal_scanner,
+    aws_cloudwatch_log_group.virustotal_scanner,
+  ]
+
+  tags = local.default_tags
+}
+
+################################################################################
+# VirusTotal Scanner — EventBridge S3 Trigger (conditional)
+################################################################################
+
+resource "aws_cloudwatch_event_rule" "virustotal_s3_trigger" {
+  count = var.enable_virustotal_scanning ? 1 : 0
+
+  name        = "${var.name_prefix}-virustotal-s3-trigger"
+  description = "Triggers VirusTotal scanner on S3 object uploads to the ingress bucket"
+
+  event_pattern = jsonencode({
+    source      = ["aws.s3"]
+    detail-type = ["Object Created"]
+    detail = {
+      bucket = {
+        name = [module.s3_buckets.ingress_bucket_id]
+      }
+    }
+  })
+
+  tags = local.default_tags
+}
+
+resource "aws_cloudwatch_event_target" "virustotal_s3_trigger" {
+  count = var.enable_virustotal_scanning ? 1 : 0
+
+  rule = aws_cloudwatch_event_rule.virustotal_s3_trigger[0].name
+  arn  = aws_lambda_function.virustotal_scanner[0].arn
+
+  retry_policy {
+    maximum_event_age_in_seconds = 3600
+    maximum_retry_attempts       = 2
+  }
+}
+
+resource "aws_lambda_permission" "virustotal_eventbridge" {
+  count = var.enable_virustotal_scanning ? 1 : 0
+
+  statement_id  = "AllowEventBridgeInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.virustotal_scanner[0].function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.virustotal_s3_trigger[0].arn
 }
 
 ################################################################################

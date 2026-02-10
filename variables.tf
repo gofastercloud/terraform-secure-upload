@@ -385,6 +385,84 @@ variable "object_lock_retention_mode" {
 }
 
 ################################################################################
+# Egress Notifications
+################################################################################
+
+variable "enable_egress_notifications" {
+  description = "Enable SNS notifications when clean files are delivered to the egress bucket. Creates a separate SNS topic for egress events."
+  type        = bool
+  default     = false
+}
+
+variable "egress_notification_emails" {
+  description = "Email addresses subscribed to the egress notification SNS topic. Only used when enable_egress_notifications is true."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition = alltrue([
+      for email in var.egress_notification_emails :
+      can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", email))
+    ])
+    error_message = "Each egress_notification_emails entry must be a valid email address."
+  }
+}
+
+################################################################################
+# VirusTotal Hash Lookup
+################################################################################
+
+variable "enable_virustotal_scanning" {
+  description = "Enable VirusTotal hash lookup scanning. When true, files that pass GuardDuty scanning are checked against the VirusTotal API before prompt injection scanning."
+  type        = bool
+  default     = false
+}
+
+variable "virustotal_api_key" {
+  description = "VirusTotal API key. Required when enable_virustotal_scanning is true. Stored as an SSM SecureString parameter."
+  type        = string
+  default     = null
+  sensitive   = true
+
+  validation {
+    condition     = !var.enable_virustotal_scanning || var.virustotal_api_key != null
+    error_message = "virustotal_api_key is required when enable_virustotal_scanning is true."
+  }
+}
+
+variable "virustotal_threshold" {
+  description = "Number of VirusTotal positive detections at or above which a file is quarantined."
+  type        = number
+  default     = 3
+
+  validation {
+    condition     = var.virustotal_threshold >= 1
+    error_message = "virustotal_threshold must be at least 1."
+  }
+}
+
+################################################################################
+# Audit Trail
+################################################################################
+
+variable "enable_audit_trail" {
+  description = "Enable a DynamoDB audit trail that records every file at each pipeline stage."
+  type        = bool
+  default     = false
+}
+
+variable "audit_trail_retention_days" {
+  description = "Number of days to retain audit trail records. Set to 0 to retain forever."
+  type        = number
+  default     = 365
+
+  validation {
+    condition     = var.audit_trail_retention_days >= 0
+    error_message = "audit_trail_retention_days must be 0 (forever) or a positive number."
+  }
+}
+
+################################################################################
 # Observability
 ################################################################################
 
