@@ -163,7 +163,7 @@ data "aws_iam_policy_document" "sftp_user_assume" {
     condition {
       test     = "ArnLike"
       variable = "aws:SourceArn"
-      values   = [local.server_arn]
+      values   = ["arn:aws:transfer:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:user/${local.server_id}/*"]
     }
   }
 }
@@ -192,6 +192,7 @@ data "aws_iam_policy_document" "sftp_user" {
       variable = "s3:prefix"
       values = [
         "${local.home_prefix[each.key]}*",
+        trimsuffix(local.home_prefix[each.key], "/"),
       ]
     }
   }

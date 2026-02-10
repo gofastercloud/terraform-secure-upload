@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-02-10
+
+### Fixed
+
+- **S3 bucket policy `StringNotEqualsIfExists` incorrect for Deny statements** — The v0.2.1 fix was wrong: `StringNotEqualsIfExists` on a Deny evaluates to `true` when the condition key is absent, which still blocks uploads without explicit encryption headers. Replaced with `StringNotEquals` + `Null` condition guard (`"Null": {"s3:x-amz-server-side-encryption": "false"}`) across all three buckets (6 statements). The Deny now only fires when the header is explicitly present with a non-KMS value; absent headers fall through to bucket default SSE-KMS.
+
+- **SFTP user IAM trust policy `aws:SourceArn` used wrong ARN type** — Transfer Family passes a user ARN (`arn:aws:transfer:region:account:user/server-id/username`), not a server ARN, when assuming the data access role. Changed `aws:SourceArn` from `server/*` to `user/server-id/*` to match. The logging role (which correctly uses `server/*`) was unaffected.
+
+- **SFTP `ListBucket` condition too restrictive for directory stat** — The `s3:prefix` condition only allowed `uploads/dave/*` but Transfer Family also needs to stat the home directory prefix itself (`uploads/dave` without trailing slash). Added the bare prefix as a second allowed value.
+
+### Verified
+
+- End-to-end smoke test completed: SFTP upload → GuardDuty scan → Lambda routing → egress/quarantine. Clean files route to egress, EICAR test file routes to quarantine with SNS malware alert email.
+
 ## [0.2.2] - 2025-02-10
 
 ### Fixed
