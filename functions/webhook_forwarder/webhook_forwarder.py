@@ -196,6 +196,8 @@ def handler(event, context):
     records = event.get("Records", [])
     logger.info("Received %d SNS record(s)", len(records))
 
+    errors = []
+
     for record in records:
         alert = _parse_sns_message(record)
         logger.info(
@@ -205,9 +207,20 @@ def handler(event, context):
         )
 
         if DISCORD_WEBHOOK_SSM_PARAMETER:
-            _send_discord(alert)
+            try:
+                _send_discord(alert)
+            except Exception:
+                logger.exception("Discord integration failed for %s", alert["file_key"])
+                errors.append("discord")
 
         if SERVICENOW_INSTANCE_URL:
-            _send_servicenow(alert)
+            try:
+                _send_servicenow(alert)
+            except Exception:
+                logger.exception("ServiceNow integration failed for %s", alert["file_key"])
+                errors.append("servicenow")
+
+    if errors:
+        raise RuntimeError(f"Integration(s) failed: {', '.join(errors)}")
 
     return {"statusCode": 200, "body": f"Processed {len(records)} record(s)."}

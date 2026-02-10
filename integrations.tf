@@ -28,7 +28,7 @@ resource "aws_iam_role" "chatbot" {
     ]
   })
 
-  tags = var.tags
+  tags = local.default_tags
 }
 
 resource "aws_iam_role_policy" "chatbot" {
@@ -41,12 +41,19 @@ resource "aws_iam_role_policy" "chatbot" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "CloudWatchReadOnly"
+        Sid    = "CloudWatchMetricsReadOnly"
         Effect = "Allow"
         Action = [
           "cloudwatch:Describe*",
           "cloudwatch:Get*",
           "cloudwatch:List*",
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "CloudWatchLogsReadOnly"
+        Effect = "Allow"
+        Action = [
           "logs:Get*",
           "logs:List*",
           "logs:Describe*",
@@ -54,7 +61,7 @@ resource "aws_iam_role_policy" "chatbot" {
           "logs:StopQuery",
           "logs:FilterLogEvents",
         ]
-        Resource = "*"
+        Resource = "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${var.name_prefix}-*"
       },
       {
         Sid    = "SNSTopicAccess"
@@ -89,7 +96,7 @@ resource "aws_chatbot_slack_channel_configuration" "this" {
   slack_channel_id   = var.slack_channel_id
   sns_topic_arns     = [module.file_router.sns_topic_arn]
 
-  tags = var.tags
+  tags = local.default_tags
 }
 
 ################################################################################
@@ -106,7 +113,7 @@ resource "aws_chatbot_teams_channel_configuration" "this" {
   channel_id         = var.teams_channel_id
   sns_topic_arns     = [module.file_router.sns_topic_arn]
 
-  tags = var.tags
+  tags = local.default_tags
 }
 
 ################################################################################
@@ -179,7 +186,7 @@ resource "aws_ssm_parameter" "discord_webhook_url" {
   value  = var.discord_webhook_url
   key_id = local.kms_key_arn
 
-  tags = var.tags
+  tags = local.default_tags
 }
 
 data "archive_file" "webhook_forwarder" {
@@ -196,7 +203,7 @@ resource "aws_cloudwatch_log_group" "webhook_forwarder" {
   name              = "/aws/lambda/${var.name_prefix}-webhook-forwarder"
   retention_in_days = var.log_retention_days
   kms_key_id        = local.kms_key_arn
-  tags              = var.tags
+  tags              = local.default_tags
 }
 
 resource "aws_iam_role" "webhook_forwarder" {
@@ -220,7 +227,7 @@ resource "aws_iam_role" "webhook_forwarder" {
     ]
   })
 
-  tags = var.tags
+  tags = local.default_tags
 }
 
 resource "aws_iam_role_policy" "webhook_forwarder" {
@@ -308,7 +315,7 @@ resource "aws_lambda_function" "webhook_forwarder" {
     aws_cloudwatch_log_group.webhook_forwarder,
   ]
 
-  tags = var.tags
+  tags = local.default_tags
 }
 
 resource "aws_sns_topic_subscription" "webhook_forwarder" {
