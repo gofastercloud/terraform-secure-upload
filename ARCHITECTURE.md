@@ -114,6 +114,12 @@ terraform-secure-upload/
     and the egress module uses `${name_prefix}-egress` to prevent Transfer Family
     resource name collisions when both are enabled simultaneously.
 
+11. **CloudWatch dashboard**: Optional observability layer gated behind
+    `enable_cloudwatch_dashboard`. Uses CloudWatch metric filters on the existing
+    Lambda log group to derive file routing metrics (egress, quarantine, review,
+    skipped) without any Lambda code changes. The dashboard combines custom metrics
+    with native AWS/Lambda, AWS/SQS, and AWS/S3 metrics in a single view.
+
 ## External Dependencies and Caller Responsibilities
 
 This module is largely self-contained, but several configurations require the caller to manage resources or policies outside the module:

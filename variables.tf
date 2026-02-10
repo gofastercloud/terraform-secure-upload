@@ -385,6 +385,16 @@ variable "object_lock_retention_mode" {
 }
 
 ################################################################################
+# Observability
+################################################################################
+
+variable "enable_cloudwatch_dashboard" {
+  description = "Create a CloudWatch dashboard with metric filters for pipeline observability. When false (default), no dashboard or metric filter resources are created."
+  type        = bool
+  default     = false
+}
+
+################################################################################
 # Logging
 ################################################################################
 

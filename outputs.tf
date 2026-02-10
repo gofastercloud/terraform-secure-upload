@@ -133,3 +133,12 @@ output "eventbridge_rule_arn" {
   description = "ARN of the EventBridge rule for GuardDuty scan results."
   value       = module.file_router.eventbridge_rule_arn
 }
+
+################################################################################
+# Observability
+################################################################################
+
+output "cloudwatch_dashboard_arn" {
+  description = "ARN of the CloudWatch pipeline dashboard (null when enable_cloudwatch_dashboard is false)."
+  value       = module.file_router.cloudwatch_dashboard_arn
+}

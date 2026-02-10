@@ -317,3 +317,215 @@ resource "aws_lambda_permission" "eventbridge" {
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.scan_result.arn
 }
+
+################################################################################
+# CloudWatch Dashboard (optional)
+################################################################################
+
+locals {
+  dashboard_namespace = "${var.name_prefix}/SecureUpload"
+}
+
+resource "aws_cloudwatch_log_metric_filter" "files_routed_to_egress" {
+  count = var.enable_cloudwatch_dashboard ? 1 : 0
+
+  name           = "${var.name_prefix}-files-routed-to-egress"
+  log_group_name = aws_cloudwatch_log_group.file_router.name
+  pattern        = "\"File routed to egress bucket\""
+
+  metric_transformation {
+    name      = "FilesRoutedToEgress"
+    namespace = local.dashboard_namespace
+    value     = "1"
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "files_quarantined" {
+  count = var.enable_cloudwatch_dashboard ? 1 : 0
+
+  name           = "${var.name_prefix}-files-quarantined"
+  log_group_name = aws_cloudwatch_log_group.file_router.name
+  pattern        = "\"File routed to quarantine bucket\""
+
+  metric_transformation {
+    name      = "FilesQuarantined"
+    namespace = local.dashboard_namespace
+    value     = "1"
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "files_left_for_review" {
+  count = var.enable_cloudwatch_dashboard ? 1 : 0
+
+  name           = "${var.name_prefix}-files-left-for-review"
+  log_group_name = aws_cloudwatch_log_group.file_router.name
+  pattern        = "\"leaving for manual review\""
+
+  metric_transformation {
+    name      = "FilesLeftForReview"
+    namespace = local.dashboard_namespace
+    value     = "1"
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "scan_events_skipped" {
+  count = var.enable_cloudwatch_dashboard ? 1 : 0
+
+  name           = "${var.name_prefix}-scan-events-skipped"
+  log_group_name = aws_cloudwatch_log_group.file_router.name
+  pattern        = "\"Unexpected scanStatus\""
+
+  metric_transformation {
+    name      = "ScanEventsSkipped"
+    namespace = local.dashboard_namespace
+    value     = "1"
+  }
+}
+
+resource "aws_cloudwatch_dashboard" "pipeline" {
+  count = var.enable_cloudwatch_dashboard ? 1 : 0
+
+  dashboard_name = "${var.name_prefix}-secure-upload"
+
+  dashboard_body = jsonencode({
+    widgets = [
+      {
+        type   = "metric"
+        x      = 0
+        y      = 0
+        width  = 12
+        height = 6
+        properties = {
+          title  = "File Routing Outcomes"
+          region = data.aws_region.current.name
+          metrics = [
+            [local.dashboard_namespace, "FilesRoutedToEgress", { label = "Egress (clean)", color = "#2ca02c" }],
+            [local.dashboard_namespace, "FilesQuarantined", { label = "Quarantined (malware)", color = "#d62728" }],
+            [local.dashboard_namespace, "FilesLeftForReview", { label = "Left for Review", color = "#ff7f0e" }],
+            [local.dashboard_namespace, "ScanEventsSkipped", { label = "Skipped (unexpected)", color = "#9467bd" }],
+          ]
+          view    = "timeSeries"
+          stacked = false
+          period  = 300
+          stat    = "Sum"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 0
+        width  = 12
+        height = 6
+        properties = {
+          title  = "Routing Summary (24h)"
+          region = data.aws_region.current.name
+          metrics = [
+            [local.dashboard_namespace, "FilesRoutedToEgress", { label = "Egress", color = "#2ca02c" }],
+            [local.dashboard_namespace, "FilesQuarantined", { label = "Quarantined", color = "#d62728" }],
+            [local.dashboard_namespace, "FilesLeftForReview", { label = "Review", color = "#ff7f0e" }],
+          ]
+          view   = "singleValue"
+          period = 86400
+          stat   = "Sum"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 6
+        width  = 12
+        height = 6
+        properties = {
+          title  = "Lambda Invocations & Errors"
+          region = data.aws_region.current.name
+          metrics = [
+            ["AWS/Lambda", "Invocations", "FunctionName", aws_lambda_function.file_router.function_name, { label = "Invocations", color = "#1f77b4" }],
+            ["AWS/Lambda", "Errors", "FunctionName", aws_lambda_function.file_router.function_name, { label = "Errors", color = "#d62728" }],
+            ["AWS/Lambda", "Throttles", "FunctionName", aws_lambda_function.file_router.function_name, { label = "Throttles", color = "#ff7f0e" }],
+          ]
+          view    = "timeSeries"
+          stacked = false
+          period  = 300
+          stat    = "Sum"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 6
+        width  = 12
+        height = 6
+        properties = {
+          title  = "Lambda Duration"
+          region = data.aws_region.current.name
+          metrics = [
+            ["AWS/Lambda", "Duration", "FunctionName", aws_lambda_function.file_router.function_name, { label = "Average", stat = "Average", color = "#1f77b4" }],
+            ["AWS/Lambda", "Duration", "FunctionName", aws_lambda_function.file_router.function_name, { label = "p99", stat = "p99", color = "#d62728" }],
+          ]
+          view    = "timeSeries"
+          stacked = false
+          period  = 300
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 12
+        width  = 8
+        height = 6
+        properties = {
+          title  = "Dead Letter Queue"
+          region = data.aws_region.current.name
+          metrics = [
+            ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", aws_sqs_queue.dlq.name, { label = "Messages Visible", color = "#d62728" }],
+            ["AWS/SQS", "NumberOfMessagesSent", "QueueName", aws_sqs_queue.dlq.name, { label = "Messages Sent", color = "#ff7f0e" }],
+          ]
+          view    = "timeSeries"
+          stacked = false
+          period  = 300
+          stat    = "Sum"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 8
+        y      = 12
+        width  = 8
+        height = 6
+        properties = {
+          title  = "S3 Object Counts"
+          region = data.aws_region.current.name
+          metrics = [
+            ["AWS/S3", "NumberOfObjects", "BucketName", var.ingress_bucket_name, "StorageType", "AllStorageTypes", { label = "Ingress", color = "#1f77b4" }],
+            ["AWS/S3", "NumberOfObjects", "BucketName", var.egress_bucket_name, "StorageType", "AllStorageTypes", { label = "Egress", color = "#2ca02c" }],
+            ["AWS/S3", "NumberOfObjects", "BucketName", var.quarantine_bucket_name, "StorageType", "AllStorageTypes", { label = "Quarantine", color = "#d62728" }],
+          ]
+          view    = "timeSeries"
+          stacked = false
+          period  = 86400
+          stat    = "Average"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 16
+        y      = 12
+        width  = 8
+        height = 6
+        properties = {
+          title  = "S3 Bucket Sizes"
+          region = data.aws_region.current.name
+          metrics = [
+            ["AWS/S3", "BucketSizeBytes", "BucketName", var.ingress_bucket_name, "StorageType", "StandardStorage", { label = "Ingress", color = "#1f77b4" }],
+            ["AWS/S3", "BucketSizeBytes", "BucketName", var.egress_bucket_name, "StorageType", "StandardStorage", { label = "Egress", color = "#2ca02c" }],
+            ["AWS/S3", "BucketSizeBytes", "BucketName", var.quarantine_bucket_name, "StorageType", "StandardStorage", { label = "Quarantine", color = "#d62728" }],
+          ]
+          view    = "timeSeries"
+          stacked = false
+          period  = 86400
+          stat    = "Average"
+        }
+      },
+    ]
+  })
+}

@@ -143,6 +143,7 @@ module "file_router" {
   lambda_reserved_concurrency = var.lambda_reserved_concurrency
   sns_subscription_emails     = var.sns_subscription_emails
   log_retention_days          = var.log_retention_days
+  enable_cloudwatch_dashboard = var.enable_cloudwatch_dashboard
 }
 
 ################################################################################
