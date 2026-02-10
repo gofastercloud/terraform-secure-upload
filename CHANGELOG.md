@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-02-10
+
+### Added
+
+- **Slack integration** — optional AWS Chatbot configuration to deliver malware alerts to a Slack channel
+- **Microsoft Teams integration** — optional AWS Chatbot configuration to deliver malware alerts to a Teams channel
+- **PagerDuty integration** — optional SNS HTTPS subscription to forward alerts to PagerDuty Events API
+- **VictorOps / Splunk On-Call integration** — optional SNS HTTPS subscription to forward alerts to VictorOps REST endpoint
+- **Discord integration** — optional Lambda webhook forwarder that posts rich embeds to a Discord channel
+- **ServiceNow integration** — optional Lambda webhook forwarder that creates incidents in ServiceNow via the REST API, with credentials stored in Secrets Manager
+- **Integration documentation** — new [integrations.md](integrations.md) with detailed setup instructions for all six integrations
+- **Integration validation tests** — 11 new tests covering all integration variable validation rules (42 total)
+
 ## [0.3.0] - 2026-02-10
 
 ### Fixed
