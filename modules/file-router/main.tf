@@ -609,7 +609,6 @@ resource "aws_cloudwatch_dashboard" "pipeline" {
             ]
             view    = "timeSeries"
             stacked = false
-            period  = 86400
             stat    = "Average"
           }
         },
@@ -629,7 +628,6 @@ resource "aws_cloudwatch_dashboard" "pipeline" {
             ]
             view    = "timeSeries"
             stacked = false
-            period  = 86400
             stat    = "Average"
           }
         },
