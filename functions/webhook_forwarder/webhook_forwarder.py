@@ -86,8 +86,39 @@ def _parse_sns_message(record):
         "quarantine_bucket": msg.get("quarantine_bucket", "unknown"),
         "scan_result_status": msg.get("scan_result_status", "unknown"),
         "threats": msg.get("threats", []),
+        "scans": msg.get("scans", {}),
         "timestamp": msg.get("timestamp", "unknown"),
     }
+
+
+def _format_scan_fields(scans):
+    """Build Discord embed fields from the scans summary."""
+    fields = []
+    if not scans:
+        return fields
+
+    gd = scans.get("guardduty")
+    if gd:
+        fields.append({"name": "GuardDuty", "value": str(gd), "inline": True})
+
+    vt = scans.get("virustotal")
+    if isinstance(vt, dict):
+        status = vt.get("status", "unknown")
+        positives = vt.get("positives", 0)
+        total = vt.get("total", 0)
+        sha256 = vt.get("sha256", "")
+        vt_text = f"{status} ({positives}/{total})"
+        if sha256:
+            vt_text += f"\n`{sha256[:16]}...`"
+        fields.append({"name": "VirusTotal", "value": vt_text, "inline": True})
+    elif vt:
+        fields.append({"name": "VirusTotal", "value": str(vt), "inline": True})
+
+    pi = scans.get("prompt_injection")
+    if pi and pi != "clean":
+        fields.append({"name": "Prompt Injection", "value": str(pi), "inline": True})
+
+    return fields
 
 
 def _send_discord(alert):
@@ -98,17 +129,20 @@ def _send_discord(alert):
         t.get("name", "unknown") for t in alert["threats"]
     ) or "N/A"
 
+    fields = [
+        {"name": "File", "value": alert["file_key"], "inline": False},
+        {"name": "Source Bucket", "value": alert["source_bucket"], "inline": True},
+        {"name": "Quarantine Bucket", "value": alert["quarantine_bucket"], "inline": True},
+        {"name": "Scan Result", "value": alert["scan_result_status"], "inline": True},
+        {"name": "Threats", "value": threat_names, "inline": False},
+    ]
+    fields.extend(_format_scan_fields(alert.get("scans", {})))
+    fields.append({"name": "Timestamp", "value": alert["timestamp"], "inline": True})
+
     embed = {
         "title": "Malware Detected in Upload",
         "color": 0xD62728,  # red
-        "fields": [
-            {"name": "File", "value": alert["file_key"], "inline": False},
-            {"name": "Source Bucket", "value": alert["source_bucket"], "inline": True},
-            {"name": "Quarantine Bucket", "value": alert["quarantine_bucket"], "inline": True},
-            {"name": "Scan Result", "value": alert["scan_result_status"], "inline": True},
-            {"name": "Threats", "value": threat_names, "inline": False},
-            {"name": "Timestamp", "value": alert["timestamp"], "inline": True},
-        ],
+        "fields": fields,
     }
 
     payload = json.dumps({"embeds": [embed]}).encode("utf-8")
@@ -133,6 +167,27 @@ def _send_discord(alert):
         raise
 
 
+def _format_scan_lines(scans):
+    """Build plain-text scan result lines for ServiceNow descriptions."""
+    if not scans:
+        return ""
+    lines = []
+    gd = scans.get("guardduty")
+    if gd:
+        lines.append(f"GuardDuty: {gd}")
+    vt = scans.get("virustotal")
+    if isinstance(vt, dict):
+        lines.append(f"VirusTotal: {vt.get('status', 'unknown')} ({vt.get('positives', 0)}/{vt.get('total', 0)})")
+        if vt.get("sha256"):
+            lines.append(f"  SHA-256: {vt['sha256']}")
+    elif vt:
+        lines.append(f"VirusTotal: {vt}")
+    pi = scans.get("prompt_injection")
+    if pi and pi != "clean":
+        lines.append(f"Prompt Injection: {pi}")
+    return "\n".join(lines) + "\n" if lines else ""
+
+
 def _send_servicenow(alert):
     """Create an incident in ServiceNow via the REST API."""
     username, password = _get_servicenow_credentials()
@@ -141,6 +196,7 @@ def _send_servicenow(alert):
         t.get("name", "unknown") for t in alert["threats"]
     ) or "N/A"
 
+    scan_lines = _format_scan_lines(alert.get("scans", {}))
     description = (
         f"Malware detected in uploaded file.\n\n"
         f"File: {alert['file_key']}\n"
@@ -148,6 +204,7 @@ def _send_servicenow(alert):
         f"Quarantine Bucket: {alert['quarantine_bucket']}\n"
         f"Scan Result: {alert['scan_result_status']}\n"
         f"Threats: {threat_names}\n"
+        f"{scan_lines}"
         f"Timestamp: {alert['timestamp']}"
     )
 

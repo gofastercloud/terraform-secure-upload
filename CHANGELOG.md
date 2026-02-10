@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.1] - 2026-02-10
+
+### Fixed
+
+- **Discord and ServiceNow webhooks missing scan results** — The webhook forwarder Lambda was not extracting the `scans` field from quarantine SNS messages, so Discord embeds and ServiceNow incidents only showed threat names without GuardDuty status, VirusTotal details (positives/total/SHA-256), or prompt injection findings. Now both integrations include full scan results.
+
 ## [0.7.0] - 2026-02-10
 
 ### Changed
