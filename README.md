@@ -68,7 +68,7 @@ A Terraform module that creates a secure file upload pipeline on AWS with automa
 - **S3 Object Lock** — optional tamper-proof retention on the quarantine bucket
 - **Least-privilege IAM** — scoped IAM roles for GuardDuty, Lambda, Transfer Family, and SFTP users
 - **TLS enforcement** — bucket policies deny non-HTTPS requests on all buckets
-- **KMS enforcement** — bucket policies deny uploads that don't use the module's KMS key, preventing wrong-key or SSE-S3 encryption
+- **KMS enforcement** — bucket policies use `StringNotEqualsIfExists` to deny uploads that explicitly specify wrong encryption, while allowing AWS services (e.g. Transfer Family) that rely on bucket default SSE-KMS without sending encryption headers
 - **Access logging** — dedicated log bucket for S3 server access logs
 - **Lifecycle management** — configurable expiration/transition rules per bucket
 - **Dead letter queue** — SQS DLQ for Lambda invocation failures
@@ -92,10 +92,11 @@ module "secure_upload" {
   source = "path/to/terraform-secure-upload"
 
   name_prefix = "myapp"
+  # Creates buckets: myapp-<hash>-ingress, myapp-<hash>-egress, etc.
 }
 ```
 
-This creates the S3 pipeline (ingress, egress, quarantine, logs), GuardDuty scanning, Lambda router, and SNS alerting. No SFTP resources are created by default — enable them with `enable_sftp_ingress` or `enable_sftp_egress`.
+This creates the S3 pipeline (ingress, egress, quarantine, logs), GuardDuty scanning, Lambda router, and SNS alerting. Bucket names automatically include an 8-character hash of your AWS account ID for global uniqueness. No SFTP resources are created by default — enable them with `enable_sftp_ingress` or `enable_sftp_egress`.
 
 ## Full Usage
 
@@ -325,8 +326,10 @@ When using an externally managed KMS key (`create_kms_key = false`), your key po
   "Action": [
     "kms:Decrypt",
     "kms:Encrypt",
-    "kms:GenerateDataKey*",
-    "kms:ReEncrypt*",
+    "kms:GenerateDataKey",
+    "kms:GenerateDataKeyWithoutPlaintext",
+    "kms:ReEncryptFrom",
+    "kms:ReEncryptTo",
     "kms:DescribeKey"
   ],
   "Resource": "*",
@@ -388,8 +391,8 @@ Depending on your configuration, you may need to make changes **outside this mod
 
 | Scenario | External Action Required |
 |---|---|
-| **SFTP enabled** with org service allowlist SCP | Add `"transfer:*"` to the SCP `NotAction` list. See [`plans/scp-change-request-transfer-family.md`](plans/scp-change-request-transfer-family.md) for a detailed change request. |
-| **VPC-type SFTP endpoint** with org service allowlist SCP | Also add `"ec2:*"` to the SCP `NotAction` list (for security groups and ENIs). |
+| **SFTP enabled** with org service allowlist SCP | Add Transfer Family actions to the SCP `NotAction` list: `transfer:CreateServer`, `transfer:DescribeServer`, `transfer:UpdateServer`, `transfer:DeleteServer`, `transfer:CreateUser`, `transfer:DescribeUser`, `transfer:UpdateUser`, `transfer:DeleteUser`, `transfer:ImportSshPublicKey`, `transfer:DeleteSshPublicKey`, `transfer:TagResource`, `transfer:UntagResource`, `transfer:ListServers`, `transfer:ListUsers`, `transfer:ListTagsForResource`. |
+| **VPC-type SFTP endpoint** with org service allowlist SCP | Also add EC2 actions for security groups and ENIs to the SCP `NotAction` list: `ec2:CreateSecurityGroup`, `ec2:DeleteSecurityGroup`, `ec2:DescribeSecurityGroups`, `ec2:DescribeSecurityGroupRules`, `ec2:AuthorizeSecurityGroupIngress`, `ec2:AuthorizeSecurityGroupEgress`, `ec2:RevokeSecurityGroupIngress`, `ec2:RevokeSecurityGroupEgress`, `ec2:DescribeVpcs`, `ec2:DescribeSubnets`, `ec2:DescribeNetworkInterfaces`, `ec2:CreateNetworkInterface`, `ec2:DeleteNetworkInterface`, `ec2:ModifyNetworkInterfaceAttribute`, `ec2:CreateTags`, `ec2:DeleteTags`. |
 | **External KMS key** (`create_kms_key = false`) | Update the KMS key policy to grant service principals access. See [External KMS Key](#external-kms-key) above. |
 | **Cross-account KMS key** | Add cross-account grants for the module's IAM roles (output as `lambda_role_arn`, `guardduty_role_arn`, etc.). |
 | **External log bucket** (`create_log_bucket = false`) | Configure the bucket policy, encryption, and lifecycle. See [Cross-Account Log Shipping](#cross-account-log-shipping) above. |
@@ -408,7 +411,15 @@ For a comprehensive security checklist for external resources, see [SECURITY.md]
 - **SNS email confirmation** — Email subscriptions require manual confirmation by each recipient before alerts are delivered.
 - **SFTP users are service-managed** — This module uses Transfer Family's service-managed identity provider. Custom/external identity providers are not supported.
 - **Single ingress bucket** — All SFTP users share the same ingress bucket, isolated by home directory prefix.
-- **Organization SCPs** — If your AWS Organization uses a service allowlist SCP, `"transfer:*"` must be added to deploy SFTP resources. VPC-type endpoints additionally require `"ec2:*"`. See `plans/scp-change-request-transfer-family.md`.
+- **Organization SCPs** — If your AWS Organization uses a service allowlist SCP, specific Transfer Family actions must be added to deploy SFTP resources. VPC-type endpoints additionally require EC2 actions for security groups and ENIs. See [External Changes Required](#external-changes-required) for the full list.
+
+## Upgrading to v0.2.1
+
+v0.2.1 contains two breaking changes:
+
+1. **Bucket names now include a hashed account ID** — Bucket names changed from `<prefix>-ingress` to `<prefix>-<hash>-ingress` (and similarly for egress, quarantine, logs). This ensures global uniqueness. Existing deployments will see Terraform plan to destroy and recreate all four buckets. **Back up your data before upgrading** or use `terraform state mv` to migrate.
+
+2. **S3 bucket policy condition changed** — `StringNotEquals` was replaced with `StringNotEqualsIfExists` for the `DenyNonKMSEncryption` and `DenyWrongKMSKey` policy statements. This fixes `AccessDenied` errors from AWS services (Transfer Family, GuardDuty, Lambda) that rely on bucket default encryption and don't send explicit encryption headers. This is a policy-only change and does not affect bucket resources.
 
 ## Contributing
 
