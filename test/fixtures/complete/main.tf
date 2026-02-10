@@ -24,10 +24,10 @@ variable "test_id" {
 module "secure_upload" {
   source = "../../../"
 
-  name_prefix         = "terratest-full-${var.test_id}"
-  enable_sftp_ingress = true
-  create_sftp_server  = true
-  sftp_endpoint_type  = "PUBLIC"
+  name_prefix                = "terratest-full-${var.test_id}"
+  enable_sftp_ingress        = true
+  create_sftp_ingress_server = true
+  sftp_ingress_endpoint_type = "PUBLIC"
 
   ingress_lifecycle_days    = 2
   egress_lifecycle_days     = 60
@@ -39,7 +39,7 @@ module "secure_upload" {
 
   log_retention_days = 30
 
-  sftp_users = [
+  sftp_ingress_users = [
     {
       username              = "test-user-1"
       ssh_public_key        = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7example1 test-user-1@example.com"
@@ -117,12 +117,12 @@ output "guardduty_protection_plan_arn" {
   value = module.secure_upload.guardduty_protection_plan_arn
 }
 
-output "sftp_server_id" {
-  value = module.secure_upload.sftp_server_id
+output "sftp_ingress_server_id" {
+  value = module.secure_upload.sftp_ingress_server_id
 }
 
-output "sftp_server_endpoint" {
-  value = module.secure_upload.sftp_server_endpoint
+output "sftp_ingress_server_endpoint" {
+  value = module.secure_upload.sftp_ingress_server_endpoint
 }
 
 output "sftp_egress_server_id" {
@@ -137,8 +137,8 @@ output "log_bucket_arn" {
   value = module.secure_upload.log_bucket_arn
 }
 
-output "sftp_user_arns" {
-  value = module.secure_upload.sftp_user_arns
+output "sftp_ingress_user_arns" {
+  value = module.secure_upload.sftp_ingress_user_arns
 }
 
 output "sftp_egress_user_arns" {

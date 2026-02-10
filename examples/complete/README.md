@@ -22,6 +22,6 @@ terraform apply
 ## Test SFTP Upload
 
 ```bash
-sftp -i ~/.ssh/partner-a partner-a@$(terraform output -raw sftp_server_endpoint)
+sftp -i ~/.ssh/partner-a partner-a@$(terraform output -raw sftp_ingress_server_endpoint)
 sftp> put test-file.txt /
 ```

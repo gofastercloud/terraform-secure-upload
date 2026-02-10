@@ -124,13 +124,13 @@ module "secure_upload" {
 
   # SFTP
   enable_sftp_ingress        = true
-  create_sftp_server = true
-  sftp_endpoint_type  = "VPC"
-  sftp_vpc_id         = "vpc-0abc123"
-  sftp_subnet_ids     = ["subnet-aaa", "subnet-bbb"]
-  sftp_allowed_cidrs  = ["10.0.0.0/8"]
+  create_sftp_ingress_server = true
+  sftp_ingress_endpoint_type  = "VPC"
+  sftp_ingress_vpc_id         = "vpc-0abc123"
+  sftp_ingress_subnet_ids     = ["subnet-aaa", "subnet-bbb"]
+  sftp_ingress_allowed_cidrs  = ["10.0.0.0/8"]
 
-  sftp_users = [
+  sftp_ingress_users = [
     {
       username              = "partner-a"
       ssh_public_key        = file("keys/partner-a.pub")
@@ -182,13 +182,13 @@ module "secure_upload" {
 | Name | Description | Type | Default | Required |
 |---|---|---|---|---|
 | `enable_sftp_ingress` | Enable the SFTP upload path via AWS Transfer Family. When `false` (default), no Transfer Family resources are created for ingress. | `bool` | `false` | no |
-| `create_sftp_server` | Create a new Transfer Family server for ingress. Only takes effect when `enable_sftp_ingress` is `true`. Set `false` to attach users to an existing server via `sftp_server_id`. | `bool` | `true` | no |
-| `sftp_server_id` | ID of an existing Transfer Family server. Only used when `enable_sftp_ingress` is `true` and `create_sftp_server` is `false`. | `string` | `null` | no |
-| `sftp_endpoint_type` | Transfer Family endpoint type — `PUBLIC` or `VPC`. Only used when both `enable_sftp_ingress` and `create_sftp_server` are `true`. | `string` | `"PUBLIC"` | no |
-| `sftp_vpc_id` | VPC ID for a VPC-type ingress endpoint. Required when `sftp_endpoint_type` is `VPC`. | `string` | `null` | no |
-| `sftp_subnet_ids` | Subnet IDs for a VPC-type ingress endpoint. Required when `sftp_endpoint_type` is `VPC`. | `list(string)` | `[]` | no |
-| `sftp_allowed_cidrs` | CIDR blocks allowed to access the ingress SFTP server security group. Required when `sftp_endpoint_type` is `VPC`. | `list(string)` | `[]` | no |
-| `sftp_users` | Ingress SFTP users. Each must have `username`, `ssh_public_key`, and `home_directory_prefix` (must start/end with `/`, e.g. `/uploads/partner-a/`). Bare `/` is not allowed. | `list(object)` | `[]` | no |
+| `create_sftp_ingress_server` | Create a new Transfer Family server for ingress. Only takes effect when `enable_sftp_ingress` is `true`. Set `false` to attach users to an existing server via `sftp_ingress_server_id`. | `bool` | `true` | no |
+| `sftp_ingress_server_id` | ID of an existing Transfer Family server. Only used when `enable_sftp_ingress` is `true` and `create_sftp_ingress_server` is `false`. | `string` | `null` | no |
+| `sftp_ingress_endpoint_type` | Transfer Family endpoint type — `PUBLIC` or `VPC`. Only used when both `enable_sftp_ingress` and `create_sftp_ingress_server` are `true`. | `string` | `"PUBLIC"` | no |
+| `sftp_ingress_vpc_id` | VPC ID for a VPC-type ingress endpoint. Required when `sftp_ingress_endpoint_type` is `VPC`. | `string` | `null` | no |
+| `sftp_ingress_subnet_ids` | Subnet IDs for a VPC-type ingress endpoint. Required when `sftp_ingress_endpoint_type` is `VPC`. | `list(string)` | `[]` | no |
+| `sftp_ingress_allowed_cidrs` | CIDR blocks allowed to access the ingress SFTP server security group. Required when `sftp_ingress_endpoint_type` is `VPC`. | `list(string)` | `[]` | no |
+| `sftp_ingress_users` | Ingress SFTP users. Each must have `username`, `ssh_public_key`, and `home_directory_prefix` (must start/end with `/`, e.g. `/uploads/partner-a/`). Bare `/` is not allowed. | `list(object)` | `[]` | no |
 
 ### SFTP Egress
 
@@ -256,9 +256,9 @@ module "secure_upload" {
 | `log_bucket_id` | Name of the S3 access-log bucket. |
 | `log_bucket_arn` | ARN of the S3 access-log bucket. |
 | `kms_key_arn` | ARN of the KMS key used for encryption. |
-| `sftp_server_id` | ID of the AWS Transfer Family SFTP server (null if SFTP disabled). |
-| `sftp_server_endpoint` | Endpoint hostname of the SFTP server (null if SFTP disabled). |
-| `sftp_user_arns` | Map of ingress SFTP username to Transfer user ARN. |
+| `sftp_ingress_server_id` | ID of the AWS Transfer Family SFTP server (null if SFTP disabled). |
+| `sftp_ingress_server_endpoint` | Endpoint hostname of the SFTP server (null if SFTP disabled). |
+| `sftp_ingress_user_arns` | Map of ingress SFTP username to Transfer user ARN. |
 | `sftp_egress_server_id` | ID of the egress SFTP server (null if egress disabled). |
 | `sftp_egress_server_endpoint` | Endpoint hostname of the egress SFTP server (null if egress disabled). |
 | `sftp_egress_user_arns` | Map of egress SFTP username to Transfer user ARN. |
@@ -371,6 +371,23 @@ When using an external log bucket, the module does not manage the bucket's lifec
 
 The `log_bucket_arn` output will be `null` when using an external bucket (since the module does not own it).
 
+## External Changes Required
+
+Depending on your configuration, you may need to make changes **outside this module** before deployment:
+
+| Scenario | External Action Required |
+|---|---|
+| **SFTP enabled** with org service allowlist SCP | Add `"transfer:*"` to the SCP `NotAction` list. See [`plans/scp-change-request-transfer-family.md`](plans/scp-change-request-transfer-family.md) for a detailed change request. |
+| **VPC-type SFTP endpoint** with org service allowlist SCP | Also add `"ec2:*"` to the SCP `NotAction` list (for security groups and ENIs). |
+| **External KMS key** (`create_kms_key = false`) | Update the KMS key policy to grant service principals access. See [External KMS Key](#external-kms-key) above. |
+| **Cross-account KMS key** | Add cross-account grants for the module's IAM roles (output as `lambda_role_arn`, `guardduty_role_arn`, etc.). |
+| **External log bucket** (`create_log_bucket = false`) | Configure the bucket policy, encryption, and lifecycle. See [Cross-Account Log Shipping](#cross-account-log-shipping) above. |
+| **Existing SFTP server** (`create_sftp_ingress_server = false`) | Ensure the server uses `SERVICE_MANAGED` identity and the `SFTP` protocol. |
+| **SNS email alerts** | Recipients must manually confirm their email subscription before alerts are delivered. |
+| **GuardDuty first use** | The calling principal needs `iam:CreateServiceLinkedRole` permission for GuardDuty to create its service-linked role on first use. |
+
+For a comprehensive security checklist for external resources, see [SECURITY.md](SECURITY.md).
+
 ## Known Limitations
 
 - **GuardDuty region availability** — GuardDuty Malware Protection for S3 is not available in all AWS regions. Check [AWS regional availability](https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_regions.html).
@@ -380,6 +397,7 @@ The `log_bucket_arn` output will be `null` when using an external bucket (since 
 - **SNS email confirmation** — Email subscriptions require manual confirmation by each recipient before alerts are delivered.
 - **SFTP users are service-managed** — This module uses Transfer Family's service-managed identity provider. Custom/external identity providers are not supported.
 - **Single ingress bucket** — All SFTP users share the same ingress bucket, isolated by home directory prefix.
+- **Organization SCPs** — If your AWS Organization uses a service allowlist SCP, `"transfer:*"` must be added to deploy SFTP resources. VPC-type endpoints additionally require `"ec2:*"`. See `plans/scp-change-request-transfer-family.md`.
 
 ## Contributing
 

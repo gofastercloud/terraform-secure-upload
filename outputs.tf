@@ -55,19 +55,19 @@ output "kms_key_arn" {
 # SFTP / Transfer Family
 ################################################################################
 
-output "sftp_server_id" {
+output "sftp_ingress_server_id" {
   description = "ID of the AWS Transfer Family SFTP server."
-  value       = var.enable_sftp_ingress ? module.sftp[0].server_id : null
+  value       = var.enable_sftp_ingress ? module.sftp_ingress[0].server_id : null
 }
 
-output "sftp_server_endpoint" {
+output "sftp_ingress_server_endpoint" {
   description = "Endpoint hostname of the AWS Transfer Family SFTP server."
-  value       = var.enable_sftp_ingress ? module.sftp[0].server_endpoint : null
+  value       = var.enable_sftp_ingress ? module.sftp_ingress[0].server_endpoint : null
 }
 
-output "sftp_user_arns" {
+output "sftp_ingress_user_arns" {
   description = "Map of ingress SFTP username to Transfer user ARN."
-  value       = var.enable_sftp_ingress ? module.sftp[0].user_arns : {}
+  value       = var.enable_sftp_ingress ? module.sftp_ingress[0].user_arns : {}
 }
 
 ################################################################################

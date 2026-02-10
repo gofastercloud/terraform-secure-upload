@@ -9,12 +9,12 @@ variable "region" {
   default     = "us-east-1"
 }
 
-variable "sftp_server_id" {
-  description = "ID of the existing Transfer Family server."
+variable "sftp_ingress_server_id" {
+  description = "ID of the existing Transfer Family server for ingress."
   type        = string
 }
 
-variable "sftp_users" {
+variable "sftp_ingress_users" {
   description = "Ingress SFTP users. home_directory_prefix must start/end with / and contain at least one path component (e.g. /uploads/partner-a/)."
   type = list(object({
     username              = string

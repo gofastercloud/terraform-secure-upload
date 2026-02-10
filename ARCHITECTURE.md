@@ -102,3 +102,54 @@ terraform-secure-upload/
 8. **Docker-based local dev**: A `Makefile` wraps all checks (`fmt`, `validate`, `test`)
    in a Docker container pinned to the same Terraform version as CI, avoiding version
    mismatch issues.
+
+## External Dependencies and Caller Responsibilities
+
+This module is largely self-contained, but several configurations require the caller to manage resources or policies outside the module:
+
+### SCP / Organization Policy Changes
+
+If your AWS Organization uses a service allowlist SCP (Deny with `NotAction` pattern), you must ensure `"transfer:*"` is in the allowed list before deploying SFTP functionality. The base pipeline (S3, Lambda, GuardDuty, KMS, EventBridge, SQS, SNS, CloudWatch) uses only commonly-allowed services and is unlikely to be blocked.
+
+See `plans/scp-change-request-transfer-family.md` for a detailed change request template.
+
+### External KMS Key (`create_kms_key = false`)
+
+When bringing your own KMS key, the caller is responsible for:
+
+- **Key policy grants** — The key policy must allow `kms:Decrypt`, `kms:Encrypt`, `kms:GenerateDataKey*`, `kms:ReEncrypt*`, and `kms:DescribeKey` for the AWS service principals used by the module (`guardduty.amazonaws.com`, `lambda.amazonaws.com`, `s3.amazonaws.com`, `transfer.amazonaws.com`, `sns.amazonaws.com`). Scope with `aws:SourceAccount` condition.
+- **Cross-account grants** — If the KMS key lives in a different account, you must also create grants or key policy statements allowing the IAM roles created by this module to use the key. The module outputs all role ARNs for this purpose.
+- **Key rotation** — The module does not manage rotation for externally provided keys.
+
+### External Log Bucket (`create_log_bucket = false`)
+
+When shipping S3 access logs to an existing bucket:
+
+- **Bucket policy** — The target bucket must allow `s3:PutObject` from the `logging.s3.amazonaws.com` service principal, scoped to the source account.
+- **Encryption** — If the log bucket uses KMS-SSE, the key policy must allow the S3 log delivery service to encrypt.
+- **Lifecycle and retention** — The module does not manage lifecycle rules on the external bucket.
+
+### Existing Transfer Family Server (`create_sftp_ingress_server = false`)
+
+When attaching to a pre-existing SFTP server:
+
+- **Server configuration** — The existing server must use the `SERVICE_MANAGED` identity provider type and support the `SFTP` protocol.
+- **Logging role** — The module creates its own CloudWatch logging role, but the existing server's logging configuration is not modified.
+- **Security groups** — For VPC-type servers, the caller manages security groups and network access.
+
+### VPC Endpoint Type (`sftp_ingress_endpoint_type = "VPC"`)
+
+When using VPC-type SFTP endpoints:
+
+- **VPC and subnets** — Must exist before module deployment. The module does not create networking infrastructure.
+- **Security groups** — The module creates a security group with ingress from `sftp_ingress_allowed_cidrs`. The caller must ensure the VPC has appropriate routing (NAT gateway, VPC endpoints, or internet gateway as needed).
+- **EC2 SCP permissions** — VPC-type endpoints require `ec2:*` in service allowlist SCPs (for security group and ENI operations). This is separate from the `transfer:*` requirement.
+
+### GuardDuty
+
+- **Regional availability** — GuardDuty Malware Protection for S3 must be available in the deployment region. The module creates a standalone `aws_guardduty_malware_protection_plan` and does not require an account-wide GuardDuty detector.
+- **Service-linked role** — GuardDuty may require a service-linked role (`AWSServiceRoleForAmazonGuardDutyMalwareProtection`). AWS creates this automatically on first use, but it requires `iam:CreateServiceLinkedRole` permission.
+
+### SNS Email Subscriptions
+
+- Email subscriptions created by the module require **manual confirmation** by each recipient. Unconfirmed subscriptions will not receive alerts.

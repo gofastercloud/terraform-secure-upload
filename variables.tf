@@ -65,68 +65,68 @@ variable "enable_sftp_ingress" {
   default     = false
 }
 
-variable "create_sftp_server" {
-  description = "Create a new Transfer Family server for ingress. Only takes effect when enable_sftp_ingress is true. Set to false to attach users to an existing server via sftp_server_id."
+variable "create_sftp_ingress_server" {
+  description = "Create a new Transfer Family server for ingress. Only takes effect when enable_sftp_ingress is true. Set to false to attach users to an existing server via sftp_ingress_server_id."
   type        = bool
   default     = true
 }
 
-variable "sftp_server_id" {
-  description = "ID of an existing Transfer Family server to attach ingress users to. Only used when enable_sftp_ingress is true and create_sftp_server is false."
+variable "sftp_ingress_server_id" {
+  description = "ID of an existing Transfer Family server to attach ingress users to. Only used when enable_sftp_ingress is true and create_sftp_ingress_server is false."
   type        = string
   default     = null
 
   validation {
-    condition     = var.create_sftp_server || !var.enable_sftp_ingress || var.sftp_server_id != null
-    error_message = "sftp_server_id is required when enable_sftp_ingress is true and create_sftp_server is false."
+    condition     = var.create_sftp_ingress_server || !var.enable_sftp_ingress || var.sftp_ingress_server_id != null
+    error_message = "sftp_ingress_server_id is required when enable_sftp_ingress is true and create_sftp_ingress_server is false."
   }
 }
 
-variable "sftp_endpoint_type" {
-  description = "Transfer Family endpoint type for ingress — PUBLIC or VPC. Only used when enable_sftp_ingress and create_sftp_server are both true."
+variable "sftp_ingress_endpoint_type" {
+  description = "Transfer Family endpoint type for ingress — PUBLIC or VPC. Only used when enable_sftp_ingress and create_sftp_ingress_server are both true."
   type        = string
   default     = "PUBLIC"
 
   validation {
-    condition     = contains(["PUBLIC", "VPC"], var.sftp_endpoint_type)
-    error_message = "sftp_endpoint_type must be PUBLIC or VPC."
+    condition     = contains(["PUBLIC", "VPC"], var.sftp_ingress_endpoint_type)
+    error_message = "sftp_ingress_endpoint_type must be PUBLIC or VPC."
   }
 }
 
-variable "sftp_vpc_id" {
-  description = "VPC ID for a VPC-type ingress Transfer Family endpoint. Required when sftp_endpoint_type is VPC."
+variable "sftp_ingress_vpc_id" {
+  description = "VPC ID for a VPC-type ingress Transfer Family endpoint. Required when sftp_ingress_endpoint_type is VPC."
   type        = string
   default     = null
 
   validation {
-    condition     = var.sftp_endpoint_type != "VPC" || !var.enable_sftp_ingress || !var.create_sftp_server || var.sftp_vpc_id != null
-    error_message = "sftp_vpc_id is required when sftp_endpoint_type is VPC, enable_sftp_ingress is true, and create_sftp_server is true."
+    condition     = var.sftp_ingress_endpoint_type != "VPC" || !var.enable_sftp_ingress || !var.create_sftp_ingress_server || var.sftp_ingress_vpc_id != null
+    error_message = "sftp_ingress_vpc_id is required when sftp_ingress_endpoint_type is VPC, enable_sftp_ingress is true, and create_sftp_ingress_server is true."
   }
 }
 
-variable "sftp_subnet_ids" {
-  description = "Subnet IDs for a VPC-type ingress Transfer Family endpoint. Required when sftp_endpoint_type is VPC."
+variable "sftp_ingress_subnet_ids" {
+  description = "Subnet IDs for a VPC-type ingress Transfer Family endpoint. Required when sftp_ingress_endpoint_type is VPC."
   type        = list(string)
   default     = []
 
   validation {
-    condition     = var.sftp_endpoint_type != "VPC" || !var.enable_sftp_ingress || !var.create_sftp_server || length(var.sftp_subnet_ids) > 0
-    error_message = "sftp_subnet_ids must not be empty when sftp_endpoint_type is VPC, enable_sftp_ingress is true, and create_sftp_server is true."
+    condition     = var.sftp_ingress_endpoint_type != "VPC" || !var.enable_sftp_ingress || !var.create_sftp_ingress_server || length(var.sftp_ingress_subnet_ids) > 0
+    error_message = "sftp_ingress_subnet_ids must not be empty when sftp_ingress_endpoint_type is VPC, enable_sftp_ingress is true, and create_sftp_ingress_server is true."
   }
 }
 
-variable "sftp_allowed_cidrs" {
-  description = "CIDR blocks allowed to access the ingress SFTP server security group. Required when sftp_endpoint_type is VPC."
+variable "sftp_ingress_allowed_cidrs" {
+  description = "CIDR blocks allowed to access the ingress SFTP server security group. Required when sftp_ingress_endpoint_type is VPC."
   type        = list(string)
   default     = []
 
   validation {
-    condition     = var.sftp_endpoint_type != "VPC" || !var.enable_sftp_ingress || !var.create_sftp_server || length(var.sftp_allowed_cidrs) > 0
-    error_message = "sftp_allowed_cidrs must not be empty when sftp_endpoint_type is VPC, enable_sftp_ingress is true, and create_sftp_server is true."
+    condition     = var.sftp_ingress_endpoint_type != "VPC" || !var.enable_sftp_ingress || !var.create_sftp_ingress_server || length(var.sftp_ingress_allowed_cidrs) > 0
+    error_message = "sftp_ingress_allowed_cidrs must not be empty when sftp_ingress_endpoint_type is VPC, enable_sftp_ingress is true, and create_sftp_ingress_server is true."
   }
 }
 
-variable "sftp_users" {
+variable "sftp_ingress_users" {
   description = "Ingress SFTP users to provision. Each home_directory_prefix scopes the user to a subdirectory (must start and end with /, e.g. /uploads/partner-a/). A bare / is not allowed for ingress."
   type = list(object({
     username              = string
@@ -137,18 +137,18 @@ variable "sftp_users" {
 
   validation {
     condition = alltrue([
-      for user in var.sftp_users :
+      for user in var.sftp_ingress_users :
       can(regex("^/.+/$", user.home_directory_prefix))
     ])
-    error_message = "Each sftp_users home_directory_prefix must start and end with / and contain at least one path component. A bare / is not allowed — ingress users must be scoped to a subdirectory (e.g. /uploads/partner-a/)."
+    error_message = "Each sftp_ingress_users home_directory_prefix must start and end with / and contain at least one path component. A bare / is not allowed — ingress users must be scoped to a subdirectory (e.g. /uploads/partner-a/)."
   }
 
   validation {
     condition = alltrue([
-      for user in var.sftp_users :
+      for user in var.sftp_ingress_users :
       !can(regex("\\.\\.(/|$)", user.home_directory_prefix))
     ])
-    error_message = "sftp_users home_directory_prefix must not contain '..' path traversal segments."
+    error_message = "sftp_ingress_users home_directory_prefix must not contain '..' path traversal segments."
   }
 }
 

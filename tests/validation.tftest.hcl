@@ -32,13 +32,13 @@ run "invalid_endpoint_type" {
   command = plan
 
   variables {
-    name_prefix         = "test-val"
-    enable_sftp_ingress = false
-    sftp_endpoint_type  = "INVALID"
+    name_prefix                = "test-val"
+    enable_sftp_ingress        = false
+    sftp_ingress_endpoint_type = "INVALID"
   }
 
   expect_failures = [
-    var.sftp_endpoint_type,
+    var.sftp_ingress_endpoint_type,
   ]
 }
 
@@ -302,10 +302,10 @@ run "sftp_user_bare_slash_prefix" {
   command = plan
 
   variables {
-    name_prefix         = "test-val"
-    enable_sftp_ingress = true
-    create_sftp_server  = true
-    sftp_users = [
+    name_prefix                = "test-val"
+    enable_sftp_ingress        = true
+    create_sftp_ingress_server = true
+    sftp_ingress_users = [
       {
         username              = "testuser"
         ssh_public_key        = "ssh-rsa AAAAB3example testuser@example.com"
@@ -315,7 +315,7 @@ run "sftp_user_bare_slash_prefix" {
   }
 
   expect_failures = [
-    var.sftp_users,
+    var.sftp_ingress_users,
   ]
 }
 
@@ -327,10 +327,10 @@ run "sftp_user_path_traversal" {
   command = plan
 
   variables {
-    name_prefix         = "test-val"
-    enable_sftp_ingress = true
-    create_sftp_server  = true
-    sftp_users = [
+    name_prefix                = "test-val"
+    enable_sftp_ingress        = true
+    create_sftp_ingress_server = true
+    sftp_ingress_users = [
       {
         username              = "testuser"
         ssh_public_key        = "ssh-rsa AAAAB3example testuser@example.com"
@@ -340,7 +340,7 @@ run "sftp_user_path_traversal" {
   }
 
   expect_failures = [
-    var.sftp_users,
+    var.sftp_ingress_users,
   ]
 }
 
@@ -352,10 +352,10 @@ run "sftp_user_missing_trailing_slash" {
   command = plan
 
   variables {
-    name_prefix         = "test-val"
-    enable_sftp_ingress = true
-    create_sftp_server  = true
-    sftp_users = [
+    name_prefix                = "test-val"
+    enable_sftp_ingress        = true
+    create_sftp_ingress_server = true
+    sftp_ingress_users = [
       {
         username              = "testuser"
         ssh_public_key        = "ssh-rsa AAAAB3example testuser@example.com"
@@ -365,7 +365,7 @@ run "sftp_user_missing_trailing_slash" {
   }
 
   expect_failures = [
-    var.sftp_users,
+    var.sftp_ingress_users,
   ]
 }
 
@@ -377,15 +377,15 @@ run "sftp_server_id_required_when_existing" {
   command = plan
 
   variables {
-    name_prefix         = "test-val"
-    enable_sftp_ingress = true
-    create_sftp_server  = false
-    sftp_server_id      = null
-    sftp_users          = []
+    name_prefix                = "test-val"
+    enable_sftp_ingress        = true
+    create_sftp_ingress_server = false
+    sftp_ingress_server_id     = null
+    sftp_ingress_users         = []
   }
 
   expect_failures = [
-    var.sftp_server_id,
+    var.sftp_ingress_server_id,
   ]
 }
 
@@ -467,18 +467,18 @@ run "ingress_vpc_missing_vpc_id" {
   command = plan
 
   variables {
-    name_prefix         = "test-val"
-    enable_sftp_ingress = true
-    create_sftp_server  = true
-    sftp_endpoint_type  = "VPC"
-    sftp_vpc_id         = null
-    sftp_subnet_ids     = ["subnet-abc123"]
-    sftp_allowed_cidrs  = ["10.0.0.0/8"]
-    sftp_users          = []
+    name_prefix                = "test-val"
+    enable_sftp_ingress        = true
+    create_sftp_ingress_server = true
+    sftp_ingress_endpoint_type = "VPC"
+    sftp_ingress_vpc_id        = null
+    sftp_ingress_subnet_ids    = ["subnet-abc123"]
+    sftp_ingress_allowed_cidrs = ["10.0.0.0/8"]
+    sftp_ingress_users         = []
   }
 
   expect_failures = [
-    var.sftp_vpc_id,
+    var.sftp_ingress_vpc_id,
   ]
 }
 
@@ -490,18 +490,18 @@ run "ingress_vpc_missing_subnet_ids" {
   command = plan
 
   variables {
-    name_prefix         = "test-val"
-    enable_sftp_ingress = true
-    create_sftp_server  = true
-    sftp_endpoint_type  = "VPC"
-    sftp_vpc_id         = "vpc-abc123"
-    sftp_subnet_ids     = []
-    sftp_allowed_cidrs  = ["10.0.0.0/8"]
-    sftp_users          = []
+    name_prefix                = "test-val"
+    enable_sftp_ingress        = true
+    create_sftp_ingress_server = true
+    sftp_ingress_endpoint_type = "VPC"
+    sftp_ingress_vpc_id        = "vpc-abc123"
+    sftp_ingress_subnet_ids    = []
+    sftp_ingress_allowed_cidrs = ["10.0.0.0/8"]
+    sftp_ingress_users         = []
   }
 
   expect_failures = [
-    var.sftp_subnet_ids,
+    var.sftp_ingress_subnet_ids,
   ]
 }
 
@@ -513,18 +513,18 @@ run "ingress_vpc_missing_allowed_cidrs" {
   command = plan
 
   variables {
-    name_prefix         = "test-val"
-    enable_sftp_ingress = true
-    create_sftp_server  = true
-    sftp_endpoint_type  = "VPC"
-    sftp_vpc_id         = "vpc-abc123"
-    sftp_subnet_ids     = ["subnet-abc123"]
-    sftp_allowed_cidrs  = []
-    sftp_users          = []
+    name_prefix                = "test-val"
+    enable_sftp_ingress        = true
+    create_sftp_ingress_server = true
+    sftp_ingress_endpoint_type = "VPC"
+    sftp_ingress_vpc_id        = "vpc-abc123"
+    sftp_ingress_subnet_ids    = ["subnet-abc123"]
+    sftp_ingress_allowed_cidrs = []
+    sftp_ingress_users         = []
   }
 
   expect_failures = [
-    var.sftp_allowed_cidrs,
+    var.sftp_ingress_allowed_cidrs,
   ]
 }
 

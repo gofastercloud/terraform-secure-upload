@@ -74,12 +74,12 @@ run "sftp_disabled" {
   command = plan
 
   assert {
-    condition     = output.sftp_server_id == null
+    condition     = output.sftp_ingress_server_id == null
     error_message = "SFTP server ID should be null when enable_sftp_ingress is false"
   }
 
   assert {
-    condition     = output.sftp_server_endpoint == null
+    condition     = output.sftp_ingress_server_endpoint == null
     error_message = "SFTP server endpoint should be null when enable_sftp_ingress is false"
   }
 

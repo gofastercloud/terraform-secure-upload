@@ -145,22 +145,22 @@ module "file_router" {
 # SFTP — AWS Transfer Family (conditional)
 ################################################################################
 
-module "sftp" {
+module "sftp_ingress" {
   source = "./modules/sftp"
   count  = var.enable_sftp_ingress ? 1 : 0
 
   name_prefix        = var.name_prefix
   tags               = merge(local.default_tags, { Direction = "ingress" })
   kms_key_arn        = local.kms_key_arn
-  create_sftp_server = var.create_sftp_server
-  existing_server_id = var.sftp_server_id
-  endpoint_type      = var.sftp_endpoint_type
-  vpc_id             = var.sftp_vpc_id
-  subnet_ids         = var.sftp_subnet_ids
-  allowed_cidrs      = var.sftp_allowed_cidrs
+  create_sftp_server = var.create_sftp_ingress_server
+  existing_server_id = var.sftp_ingress_server_id
+  endpoint_type      = var.sftp_ingress_endpoint_type
+  vpc_id             = var.sftp_ingress_vpc_id
+  subnet_ids         = var.sftp_ingress_subnet_ids
+  allowed_cidrs      = var.sftp_ingress_allowed_cidrs
   bucket_name        = module.s3_buckets.ingress_bucket_id
   bucket_arn         = module.s3_buckets.ingress_bucket_arn
-  sftp_users         = var.sftp_users
+  sftp_users         = var.sftp_ingress_users
 }
 
 ################################################################################

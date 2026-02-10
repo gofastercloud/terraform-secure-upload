@@ -19,7 +19,7 @@ log_retention_days = 180
 vpc_id     = "vpc-0abc123def456"
 subnet_ids = ["subnet-aaa111", "subnet-bbb222"]
 
-sftp_users = [
+sftp_ingress_users = [
   {
     username              = "partner-a"
     ssh_public_key        = "ssh-ed25519 AAAA... partner-a@example.com"

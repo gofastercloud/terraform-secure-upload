@@ -14,11 +14,11 @@ run "sftp_new_server" {
   command = plan
 
   variables {
-    name_prefix         = "test-sftp"
-    enable_sftp_ingress = true
-    create_sftp_server  = true
-    sftp_endpoint_type  = "PUBLIC"
-    sftp_users = [
+    name_prefix                = "test-sftp"
+    enable_sftp_ingress        = true
+    create_sftp_ingress_server = true
+    sftp_ingress_endpoint_type = "PUBLIC"
+    sftp_ingress_users = [
       {
         username              = "testuser"
         ssh_public_key        = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7example testuser@example.com"
@@ -28,12 +28,12 @@ run "sftp_new_server" {
   }
 
   assert {
-    condition     = output.sftp_server_id != null
+    condition     = output.sftp_ingress_server_id != null
     error_message = "SFTP server ID should be populated when enabled"
   }
 
   assert {
-    condition     = output.sftp_server_endpoint != null
+    condition     = output.sftp_ingress_server_endpoint != null
     error_message = "SFTP server endpoint should be populated when creating a new server"
   }
 }
@@ -46,11 +46,11 @@ run "sftp_existing_server" {
   command = plan
 
   variables {
-    name_prefix         = "test-sftp-existing"
-    enable_sftp_ingress = true
-    create_sftp_server  = false
-    sftp_server_id      = "s-1234567890abcdef0"
-    sftp_users = [
+    name_prefix                = "test-sftp-existing"
+    enable_sftp_ingress        = true
+    create_sftp_ingress_server = false
+    sftp_ingress_server_id     = "s-1234567890abcdef0"
+    sftp_ingress_users = [
       {
         username              = "testuser"
         ssh_public_key        = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7example testuser@example.com"
@@ -60,12 +60,12 @@ run "sftp_existing_server" {
   }
 
   assert {
-    condition     = output.sftp_server_id != null
+    condition     = output.sftp_ingress_server_id != null
     error_message = "SFTP server ID should be populated when using existing server"
   }
 
   assert {
-    condition     = output.sftp_server_endpoint == null
+    condition     = output.sftp_ingress_server_endpoint == null
     error_message = "SFTP server endpoint should be null when using existing server"
   }
 }
@@ -83,12 +83,12 @@ run "sftp_disabled" {
   }
 
   assert {
-    condition     = output.sftp_server_id == null
+    condition     = output.sftp_ingress_server_id == null
     error_message = "SFTP server ID should be null when SFTP is disabled"
   }
 
   assert {
-    condition     = output.sftp_server_endpoint == null
+    condition     = output.sftp_ingress_server_endpoint == null
     error_message = "SFTP server endpoint should be null when SFTP is disabled"
   }
 }
@@ -156,10 +156,10 @@ run "sftp_multiple_users" {
   command = plan
 
   variables {
-    name_prefix         = "test-sftp-multi"
-    enable_sftp_ingress = true
-    create_sftp_server  = true
-    sftp_users = [
+    name_prefix                = "test-sftp-multi"
+    enable_sftp_ingress        = true
+    create_sftp_ingress_server = true
+    sftp_ingress_users = [
       {
         username              = "user-a"
         ssh_public_key        = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7exampleA user-a@example.com"
@@ -174,7 +174,7 @@ run "sftp_multiple_users" {
   }
 
   assert {
-    condition     = output.sftp_server_id != null
+    condition     = output.sftp_ingress_server_id != null
     error_message = "SFTP server ID should be populated with multiple users"
   }
 }

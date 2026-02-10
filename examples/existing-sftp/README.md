@@ -6,7 +6,7 @@ Deploys `terraform-secure-upload` and attaches SFTP users to an **existing** AWS
 
 ```bash
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars — set sftp_server_id to your existing server
+# Edit terraform.tfvars — set sftp_ingress_server_id to your existing server
 terraform init
 terraform plan
 terraform apply

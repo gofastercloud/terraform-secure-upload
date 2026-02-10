@@ -1,8 +1,8 @@
 name_prefix    = "myapp-staging"
 region         = "us-east-1"
-sftp_server_id = "s-0123456789abcdef0"
+sftp_ingress_server_id = "s-0123456789abcdef0"
 
-sftp_users = [
+sftp_ingress_users = [
   {
     username              = "vendor-uploads"
     ssh_public_key        = "ssh-ed25519 AAAA... vendor@example.com"

@@ -13,9 +13,9 @@ output "quarantine_bucket_id" {
   value       = module.secure_upload.quarantine_bucket_id
 }
 
-output "sftp_server_id" {
-  description = "Transfer Family server ID (the existing one)."
-  value       = module.secure_upload.sftp_server_id
+output "sftp_ingress_server_id" {
+  description = "Ingress Transfer Family server ID (the existing one)."
+  value       = module.secure_upload.sftp_ingress_server_id
 }
 
 output "sns_topic_arn" {

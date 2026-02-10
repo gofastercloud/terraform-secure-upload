@@ -29,13 +29,13 @@ module "secure_upload" {
   log_retention_days = var.log_retention_days
 
   # SFTP with VPC endpoint
-  enable_sftp_ingress = true
-  create_sftp_server  = true
-  sftp_endpoint_type  = "VPC"
-  sftp_vpc_id         = var.vpc_id
-  sftp_subnet_ids     = var.subnet_ids
-  sftp_allowed_cidrs  = var.sftp_allowed_cidrs
-  sftp_users          = var.sftp_users
+  enable_sftp_ingress        = true
+  create_sftp_ingress_server = true
+  sftp_ingress_endpoint_type = "VPC"
+  sftp_ingress_vpc_id        = var.vpc_id
+  sftp_ingress_subnet_ids    = var.subnet_ids
+  sftp_ingress_allowed_cidrs = var.sftp_ingress_allowed_cidrs
+  sftp_ingress_users         = var.sftp_ingress_users
 
   # SFTP Egress — read-only access to egress bucket
   enable_sftp_egress        = var.enable_sftp_egress

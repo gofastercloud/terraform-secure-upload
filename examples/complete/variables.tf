@@ -79,12 +79,12 @@ variable "subnet_ids" {
   type        = list(string)
 }
 
-variable "sftp_allowed_cidrs" {
-  description = "CIDR blocks allowed to access the SFTP server."
+variable "sftp_ingress_allowed_cidrs" {
+  description = "CIDR blocks allowed to access the ingress SFTP server."
   type        = list(string)
 }
 
-variable "sftp_users" {
+variable "sftp_ingress_users" {
   description = "Ingress SFTP users. home_directory_prefix must start/end with / and contain at least one path component (e.g. /uploads/partner-a/)."
   type = list(object({
     username              = string

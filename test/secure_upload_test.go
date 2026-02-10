@@ -117,8 +117,8 @@ func TestSftpDeployment(t *testing.T) {
 	terraform.InitAndApply(t, terraformOptions)
 
 	// ── Verify SFTP outputs ─────────────────────────────────────────────
-	sftpServerID := terraform.Output(t, terraformOptions, "sftp_server_id")
-	sftpEndpoint := terraform.Output(t, terraformOptions, "sftp_server_endpoint")
+	sftpServerID := terraform.Output(t, terraformOptions, "sftp_ingress_server_id")
+	sftpEndpoint := terraform.Output(t, terraformOptions, "sftp_ingress_server_endpoint")
 
 	assert.NotEmpty(t, sftpServerID, "SFTP server ID should not be empty")
 	assert.NotEmpty(t, sftpEndpoint, "SFTP server endpoint should not be empty")

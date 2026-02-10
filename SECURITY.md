@@ -34,6 +34,49 @@ This module follows AWS security best practices by default:
 - **SFTP path isolation** — Ingress SFTP users are scoped to a subdirectory via validated `home_directory_prefix` (bare `/` and `..` path traversal are rejected). IAM policies enforce a trailing `/` separator to prevent prefix-overlap attacks.
 - **Dead letter queue** — Failed Lambda invocations are captured in an SQS DLQ so no scan results are silently lost.
 
+## Caller Security Responsibilities
+
+While this module enforces security best practices for resources it manages, several scenarios require the caller to maintain security properties on external resources:
+
+### External KMS Key
+
+When providing your own KMS key (`create_kms_key = false`):
+
+- Ensure the key policy follows least privilege — grant only the specific service principals needed (`guardduty.amazonaws.com`, `lambda.amazonaws.com`, `s3.amazonaws.com`, `transfer.amazonaws.com`, `sns.amazonaws.com`), scoped by `aws:SourceAccount`.
+- If the key is in a different account, create cross-account grants for the module's IAM roles rather than using `"Principal": "*"` with conditions. The module outputs all role ARNs.
+- Enable automatic key rotation on your externally managed key.
+- Do not use the same key for unrelated workloads — this widens the blast radius if the key is compromised.
+
+### External Log Bucket
+
+When using an existing log bucket (`create_log_bucket = false`):
+
+- Enforce KMS-SSE or SSE-S3 encryption on the log bucket.
+- Apply a bucket policy that restricts writes to `logging.s3.amazonaws.com` with `aws:SourceAccount` condition.
+- Enable versioning and configure lifecycle rules for log retention per your compliance requirements.
+- Block public access on the log bucket.
+
+### Existing Transfer Family Server
+
+When attaching to a pre-existing SFTP server (`create_sftp_ingress_server = false`):
+
+- Ensure the server's CloudWatch logging is configured (the module does not modify existing server settings).
+- For VPC-type servers, ensure security groups restrict inbound access to known CIDR ranges.
+- Review the server's security policy — the module does not set the TLS policy on existing servers.
+
+### Organization-Level Controls
+
+- **SCP allowlist** — If your AWS Organization uses a service allowlist SCP, `"transfer:*"` must be added before deploying SFTP functionality. See `plans/scp-change-request-transfer-family.md` for a detailed analysis and change request template.
+- **Data perimeter RCPs** — Verify that any Resource Control Policies allow the AWS service principals used by this module (GuardDuty, Lambda, EventBridge, Transfer Family, S3 log delivery). These are typically exempted via `aws:PrincipalIsAWSService` conditions.
+
+### Network Security (VPC Endpoints)
+
+When using VPC-type SFTP endpoints:
+
+- Restrict `sftp_ingress_allowed_cidrs` to the minimum set of source IP ranges that need SFTP access.
+- Consider using AWS PrivateLink or VPN for partner connectivity rather than public endpoints.
+- Monitor VPC Flow Logs for unexpected traffic to the SFTP endpoint ENIs.
+
 ## Supported Versions
 
 We provide security fixes for the latest release only. If you are using an older version, please upgrade before reporting.
