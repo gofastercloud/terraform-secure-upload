@@ -458,3 +458,141 @@ run "sftp_egress_user_path_traversal" {
     var.sftp_egress_users,
   ]
 }
+
+################################################################################
+# Test: VPC endpoint type without vpc_id fails (ingress)
+################################################################################
+
+run "ingress_vpc_missing_vpc_id" {
+  command = plan
+
+  variables {
+    name_prefix         = "test-val"
+    enable_sftp_ingress = true
+    create_sftp_server  = true
+    sftp_endpoint_type  = "VPC"
+    sftp_vpc_id         = null
+    sftp_subnet_ids     = ["subnet-abc123"]
+    sftp_allowed_cidrs  = ["10.0.0.0/8"]
+    sftp_users          = []
+  }
+
+  expect_failures = [
+    var.sftp_vpc_id,
+  ]
+}
+
+################################################################################
+# Test: VPC endpoint type without subnet_ids fails (ingress)
+################################################################################
+
+run "ingress_vpc_missing_subnet_ids" {
+  command = plan
+
+  variables {
+    name_prefix         = "test-val"
+    enable_sftp_ingress = true
+    create_sftp_server  = true
+    sftp_endpoint_type  = "VPC"
+    sftp_vpc_id         = "vpc-abc123"
+    sftp_subnet_ids     = []
+    sftp_allowed_cidrs  = ["10.0.0.0/8"]
+    sftp_users          = []
+  }
+
+  expect_failures = [
+    var.sftp_subnet_ids,
+  ]
+}
+
+################################################################################
+# Test: VPC endpoint type without allowed_cidrs fails (ingress)
+################################################################################
+
+run "ingress_vpc_missing_allowed_cidrs" {
+  command = plan
+
+  variables {
+    name_prefix         = "test-val"
+    enable_sftp_ingress = true
+    create_sftp_server  = true
+    sftp_endpoint_type  = "VPC"
+    sftp_vpc_id         = "vpc-abc123"
+    sftp_subnet_ids     = ["subnet-abc123"]
+    sftp_allowed_cidrs  = []
+    sftp_users          = []
+  }
+
+  expect_failures = [
+    var.sftp_allowed_cidrs,
+  ]
+}
+
+################################################################################
+# Test: VPC endpoint type without vpc_id fails (egress)
+################################################################################
+
+run "egress_vpc_missing_vpc_id" {
+  command = plan
+
+  variables {
+    name_prefix               = "test-val"
+    enable_sftp_ingress       = false
+    enable_sftp_egress        = true
+    create_sftp_egress_server = true
+    sftp_egress_endpoint_type = "VPC"
+    sftp_egress_vpc_id        = null
+    sftp_egress_subnet_ids    = ["subnet-abc123"]
+    sftp_egress_allowed_cidrs = ["10.0.0.0/8"]
+  }
+
+  expect_failures = [
+    var.sftp_egress_vpc_id,
+  ]
+}
+
+################################################################################
+# Test: VPC endpoint type without subnet_ids fails (egress)
+################################################################################
+
+run "egress_vpc_missing_subnet_ids" {
+  command = plan
+
+  variables {
+    name_prefix               = "test-val"
+    enable_sftp_ingress       = false
+    enable_sftp_egress        = true
+    create_sftp_egress_server = true
+    sftp_egress_endpoint_type = "VPC"
+    sftp_egress_vpc_id        = "vpc-abc123"
+    sftp_egress_subnet_ids    = []
+    sftp_egress_allowed_cidrs = ["10.0.0.0/8"]
+  }
+
+  expect_failures = [
+    var.sftp_egress_subnet_ids,
+  ]
+}
+
+################################################################################
+# Test: VPC endpoint type without allowed_cidrs fails (egress)
+################################################################################
+
+run "egress_vpc_missing_allowed_cidrs" {
+  command = plan
+
+  variables {
+    name_prefix               = "test-val"
+    enable_sftp_ingress       = false
+    enable_sftp_egress        = true
+    create_sftp_egress_server = true
+    sftp_egress_endpoint_type = "VPC"
+    sftp_egress_vpc_id        = "vpc-abc123"
+    sftp_egress_subnet_ids    = ["subnet-abc123"]
+    sftp_egress_allowed_cidrs = []
+  }
+
+  expect_failures = [
+    var.sftp_egress_allowed_cidrs,
+  ]
+}

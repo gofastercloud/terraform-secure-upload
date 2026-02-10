@@ -97,18 +97,33 @@ variable "sftp_vpc_id" {
   description = "VPC ID for a VPC-type ingress Transfer Family endpoint. Required when sftp_endpoint_type is VPC."
   type        = string
   default     = null
+
+  validation {
+    condition     = var.sftp_endpoint_type != "VPC" || !var.enable_sftp_ingress || !var.create_sftp_server || var.sftp_vpc_id != null
+    error_message = "sftp_vpc_id is required when sftp_endpoint_type is VPC, enable_sftp_ingress is true, and create_sftp_server is true."
+  }
 }
 
 variable "sftp_subnet_ids" {
   description = "Subnet IDs for a VPC-type ingress Transfer Family endpoint. Required when sftp_endpoint_type is VPC."
   type        = list(string)
   default     = []
+
+  validation {
+    condition     = var.sftp_endpoint_type != "VPC" || !var.enable_sftp_ingress || !var.create_sftp_server || length(var.sftp_subnet_ids) > 0
+    error_message = "sftp_subnet_ids must not be empty when sftp_endpoint_type is VPC, enable_sftp_ingress is true, and create_sftp_server is true."
+  }
 }
 
 variable "sftp_allowed_cidrs" {
   description = "CIDR blocks allowed to access the ingress SFTP server security group. Required when sftp_endpoint_type is VPC."
   type        = list(string)
   default     = []
+
+  validation {
+    condition     = var.sftp_endpoint_type != "VPC" || !var.enable_sftp_ingress || !var.create_sftp_server || length(var.sftp_allowed_cidrs) > 0
+    error_message = "sftp_allowed_cidrs must not be empty when sftp_endpoint_type is VPC, enable_sftp_ingress is true, and create_sftp_server is true."
+  }
 }
 
 variable "sftp_users" {
@@ -179,18 +194,33 @@ variable "sftp_egress_vpc_id" {
   description = "VPC ID for a VPC-type egress Transfer Family endpoint. Required when sftp_egress_endpoint_type is VPC."
   type        = string
   default     = null
+
+  validation {
+    condition     = var.sftp_egress_endpoint_type != "VPC" || !var.enable_sftp_egress || !var.create_sftp_egress_server || var.sftp_egress_vpc_id != null
+    error_message = "sftp_egress_vpc_id is required when sftp_egress_endpoint_type is VPC, enable_sftp_egress is true, and create_sftp_egress_server is true."
+  }
 }
 
 variable "sftp_egress_subnet_ids" {
   description = "Subnet IDs for a VPC-type egress Transfer Family endpoint. Required when sftp_egress_endpoint_type is VPC."
   type        = list(string)
   default     = []
+
+  validation {
+    condition     = var.sftp_egress_endpoint_type != "VPC" || !var.enable_sftp_egress || !var.create_sftp_egress_server || length(var.sftp_egress_subnet_ids) > 0
+    error_message = "sftp_egress_subnet_ids must not be empty when sftp_egress_endpoint_type is VPC, enable_sftp_egress is true, and create_sftp_egress_server is true."
+  }
 }
 
 variable "sftp_egress_allowed_cidrs" {
   description = "CIDR blocks allowed to access the egress SFTP server security group. Required when sftp_egress_endpoint_type is VPC."
   type        = list(string)
   default     = []
+
+  validation {
+    condition     = var.sftp_egress_endpoint_type != "VPC" || !var.enable_sftp_egress || !var.create_sftp_egress_server || length(var.sftp_egress_allowed_cidrs) > 0
+    error_message = "sftp_egress_allowed_cidrs must not be empty when sftp_egress_endpoint_type is VPC, enable_sftp_egress is true, and create_sftp_egress_server is true."
+  }
 }
 
 variable "sftp_egress_users" {
