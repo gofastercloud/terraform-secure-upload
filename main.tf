@@ -171,8 +171,9 @@ module "file_router" {
   log_retention_days          = var.log_retention_days
   enable_cloudwatch_dashboard = var.enable_cloudwatch_dashboard
 
-  prompt_injection_scanner_function_arn = var.enable_prompt_injection_scanning ? aws_lambda_function.prompt_injection_scanner[0].arn : null
-  prompt_injection_threshold            = var.prompt_injection_threshold
+  prompt_injection_scanner_function_arn  = var.enable_prompt_injection_scanning ? aws_lambda_function.prompt_injection_scanner[0].arn : null
+  prompt_injection_scanner_function_name = var.enable_prompt_injection_scanning ? aws_lambda_function.prompt_injection_scanner[0].function_name : null
+  prompt_injection_threshold             = var.prompt_injection_threshold
 }
 
 ################################################################################
