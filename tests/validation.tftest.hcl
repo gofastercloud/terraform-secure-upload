@@ -824,3 +824,105 @@ run "servicenow_invalid_credentials_arn" {
     var.servicenow_credentials_secret_arn,
   ]
 }
+
+################################################################################
+# Prompt Injection Scanning variable validation tests
+################################################################################
+
+run "prompt_injection_threshold_too_low" {
+  command = plan
+
+  variables {
+    name_prefix                = "test-val"
+    enable_sftp_ingress        = false
+    prompt_injection_threshold = -1
+  }
+
+  expect_failures = [
+    var.prompt_injection_threshold,
+  ]
+}
+
+run "prompt_injection_threshold_too_high" {
+  command = plan
+
+  variables {
+    name_prefix                = "test-val"
+    enable_sftp_ingress        = false
+    prompt_injection_threshold = 101
+  }
+
+  expect_failures = [
+    var.prompt_injection_threshold,
+  ]
+}
+
+run "prompt_injection_memory_too_low" {
+  command = plan
+
+  variables {
+    name_prefix                  = "test-val"
+    enable_sftp_ingress          = false
+    prompt_injection_memory_size = 256
+  }
+
+  expect_failures = [
+    var.prompt_injection_memory_size,
+  ]
+}
+
+run "prompt_injection_memory_too_high" {
+  command = plan
+
+  variables {
+    name_prefix                  = "test-val"
+    enable_sftp_ingress          = false
+    prompt_injection_memory_size = 20480
+  }
+
+  expect_failures = [
+    var.prompt_injection_memory_size,
+  ]
+}
+
+run "prompt_injection_timeout_zero" {
+  command = plan
+
+  variables {
+    name_prefix              = "test-val"
+    enable_sftp_ingress      = false
+    prompt_injection_timeout = 0
+  }
+
+  expect_failures = [
+    var.prompt_injection_timeout,
+  ]
+}
+
+run "prompt_injection_timeout_exceeds_max" {
+  command = plan
+
+  variables {
+    name_prefix              = "test-val"
+    enable_sftp_ingress      = false
+    prompt_injection_timeout = 901
+  }
+
+  expect_failures = [
+    var.prompt_injection_timeout,
+  ]
+}
+
+run "prompt_injection_concurrency_zero" {
+  command = plan
+
+  variables {
+    name_prefix                           = "test-val"
+    enable_sftp_ingress                   = false
+    prompt_injection_reserved_concurrency = 0
+  }
+
+  expect_failures = [
+    var.prompt_injection_reserved_concurrency,
+  ]
+}

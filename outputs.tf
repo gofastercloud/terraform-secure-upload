@@ -142,3 +142,17 @@ output "cloudwatch_dashboard_arn" {
   description = "ARN of the CloudWatch pipeline dashboard (null when enable_cloudwatch_dashboard is false)."
   value       = module.file_router.cloudwatch_dashboard_arn
 }
+
+################################################################################
+# Prompt Injection Scanner
+################################################################################
+
+output "prompt_injection_scanner_function_arn" {
+  description = "ARN of the prompt injection scanner Lambda function (null when scanning is disabled)."
+  value       = var.enable_prompt_injection_scanning ? aws_lambda_function.prompt_injection_scanner[0].arn : null
+}
+
+output "prompt_injection_scanner_ecr_repository_url" {
+  description = "URL of the ECR repository for the prompt injection scanner image (null when scanning is disabled or a BYO image is provided)."
+  value       = local.build_scanner_image ? aws_ecr_repository.prompt_injection_scanner[0].repository_url : null
+}

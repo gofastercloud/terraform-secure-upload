@@ -26,3 +26,6 @@ plans/
 
 # Deployment environments (state + tfvars)
 deployments/
+
+# Model cache (prompt injection scanner)
+functions/prompt_injection_scanner/model/

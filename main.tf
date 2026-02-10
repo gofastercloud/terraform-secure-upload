@@ -165,11 +165,14 @@ module "file_router" {
   quarantine_bucket_arn       = module.s3_buckets.quarantine_bucket_arn
   lambda_runtime              = var.lambda_runtime
   lambda_memory_size          = var.lambda_memory_size
-  lambda_timeout              = var.lambda_timeout
+  lambda_timeout              = var.enable_prompt_injection_scanning ? max(var.lambda_timeout, var.prompt_injection_timeout + 30) : var.lambda_timeout
   lambda_reserved_concurrency = var.lambda_reserved_concurrency
   sns_subscription_emails     = var.sns_subscription_emails
   log_retention_days          = var.log_retention_days
   enable_cloudwatch_dashboard = var.enable_cloudwatch_dashboard
+
+  prompt_injection_scanner_function_arn = var.enable_prompt_injection_scanning ? aws_lambda_function.prompt_injection_scanner[0].arn : null
+  prompt_injection_threshold            = var.prompt_injection_threshold
 }
 
 ################################################################################
