@@ -781,11 +781,11 @@ run "servicenow_missing_instance_url" {
   command = plan
 
   variables {
-    name_prefix                       = "test-val"
-    enable_sftp_ingress               = false
-    enable_servicenow_integration     = true
-    servicenow_instance_url           = null
-    servicenow_credentials_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-AbCdEf"
+    name_prefix                   = "test-val"
+    enable_sftp_ingress           = false
+    enable_servicenow_integration = true
+    servicenow_instance_url       = null
+    servicenow_credentials        = "{\"username\":\"admin\",\"password\":\"secret\"}"
   }
 
   expect_failures = [
@@ -793,35 +793,35 @@ run "servicenow_missing_instance_url" {
   ]
 }
 
-run "servicenow_missing_credentials_arn" {
+run "servicenow_missing_credentials" {
   command = plan
 
   variables {
-    name_prefix                       = "test-val"
-    enable_sftp_ingress               = false
-    enable_servicenow_integration     = true
-    servicenow_instance_url           = "https://mycompany.service-now.com"
-    servicenow_credentials_secret_arn = null
+    name_prefix                   = "test-val"
+    enable_sftp_ingress           = false
+    enable_servicenow_integration = true
+    servicenow_instance_url       = "https://mycompany.service-now.com"
+    servicenow_credentials        = null
   }
 
   expect_failures = [
-    var.servicenow_credentials_secret_arn,
+    var.servicenow_credentials,
   ]
 }
 
-run "servicenow_invalid_credentials_arn" {
+run "servicenow_invalid_credentials_json" {
   command = plan
 
   variables {
-    name_prefix                       = "test-val"
-    enable_sftp_ingress               = false
-    enable_servicenow_integration     = true
-    servicenow_instance_url           = "https://mycompany.service-now.com"
-    servicenow_credentials_secret_arn = "arn:aws:s3:::not-a-secret"
+    name_prefix                   = "test-val"
+    enable_sftp_ingress           = false
+    enable_servicenow_integration = true
+    servicenow_instance_url       = "https://mycompany.service-now.com"
+    servicenow_credentials        = "not-valid-json"
   }
 
   expect_failures = [
-    var.servicenow_credentials_secret_arn,
+    var.servicenow_credentials,
   ]
 }
 
@@ -924,5 +924,76 @@ run "prompt_injection_concurrency_zero" {
 
   expect_failures = [
     var.prompt_injection_reserved_concurrency,
+  ]
+}
+
+################################################################################
+# Egress Notification variable validation tests
+################################################################################
+
+run "egress_notification_invalid_email" {
+  command = plan
+
+  variables {
+    name_prefix                 = "test-val"
+    enable_sftp_ingress         = false
+    enable_egress_notifications = true
+    egress_notification_emails  = ["not-an-email"]
+  }
+
+  expect_failures = [
+    var.egress_notification_emails,
+  ]
+}
+
+################################################################################
+# Audit Trail variable validation tests
+################################################################################
+
+run "audit_trail_negative_retention" {
+  command = plan
+
+  variables {
+    name_prefix                = "test-val"
+    enable_sftp_ingress        = false
+    enable_audit_trail         = true
+    audit_trail_retention_days = -1
+  }
+
+  expect_failures = [
+    var.audit_trail_retention_days,
+  ]
+}
+
+################################################################################
+# VirusTotal variable validation tests
+################################################################################
+
+run "virustotal_missing_api_key" {
+  command = plan
+
+  variables {
+    name_prefix                = "test-val"
+    enable_sftp_ingress        = false
+    enable_virustotal_scanning = true
+    virustotal_api_key         = null
+  }
+
+  expect_failures = [
+    var.virustotal_api_key,
+  ]
+}
+
+run "virustotal_threshold_zero" {
+  command = plan
+
+  variables {
+    name_prefix          = "test-val"
+    enable_sftp_ingress  = false
+    virustotal_threshold = 0
+  }
+
+  expect_failures = [
+    var.virustotal_threshold,
   ]
 }

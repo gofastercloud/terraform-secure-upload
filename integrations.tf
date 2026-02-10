@@ -189,6 +189,17 @@ resource "aws_ssm_parameter" "discord_webhook_url" {
   tags = local.default_tags
 }
 
+resource "aws_ssm_parameter" "servicenow_credentials" {
+  count = var.enable_servicenow_integration ? 1 : 0
+
+  name   = "/${var.name_prefix}/secure-upload/servicenow-credentials"
+  type   = "SecureString"
+  key_id = local.kms_key_arn
+  value  = var.servicenow_credentials
+
+  tags = local.default_tags
+}
+
 data "archive_file" "webhook_forwarder" {
   count = local.enable_webhook_forwarder ? 1 : 0
 
@@ -269,14 +280,14 @@ resource "aws_iam_role_policy" "webhook_forwarder" {
           Resource = aws_ssm_parameter.discord_webhook_url[0].arn
         },
       ] : [],
-      var.enable_servicenow_integration && var.servicenow_credentials_secret_arn != null ? [
+      var.enable_servicenow_integration ? [
         {
-          Sid    = "SecretsManagerRead"
+          Sid    = "SSMGetServiceNowCredentials"
           Effect = "Allow"
           Action = [
-            "secretsmanager:GetSecretValue",
+            "ssm:GetParameter",
           ]
-          Resource = var.servicenow_credentials_secret_arn
+          Resource = aws_ssm_parameter.servicenow_credentials[0].arn
         },
       ] : [],
     )
@@ -304,8 +315,8 @@ resource "aws_lambda_function" "webhook_forwarder" {
         DISCORD_WEBHOOK_SSM_PARAMETER = aws_ssm_parameter.discord_webhook_url[0].name
       } : {},
       var.enable_servicenow_integration && var.servicenow_instance_url != null ? {
-        SERVICENOW_INSTANCE_URL           = var.servicenow_instance_url
-        SERVICENOW_CREDENTIALS_SECRET_ARN = var.servicenow_credentials_secret_arn
+        SERVICENOW_INSTANCE_URL              = var.servicenow_instance_url
+        SERVICENOW_CREDENTIALS_SSM_PARAMETER = aws_ssm_parameter.servicenow_credentials[0].name
       } : {},
     )
   }

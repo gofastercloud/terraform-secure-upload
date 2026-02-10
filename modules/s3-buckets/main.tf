@@ -272,6 +272,15 @@ resource "aws_s3_bucket_lifecycle_configuration" "ingress" {
 }
 
 ################################################################################
+# S3 EventBridge Notifications (ingress bucket)
+################################################################################
+
+resource "aws_s3_bucket_notification" "ingress_eventbridge" {
+  bucket      = aws_s3_bucket.ingress.id
+  eventbridge = true
+}
+
+################################################################################
 # Egress Bucket
 ################################################################################
 

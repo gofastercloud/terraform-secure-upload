@@ -144,8 +144,36 @@ output "cloudwatch_dashboard_arn" {
 }
 
 ################################################################################
+# Egress Notifications
+################################################################################
+
+output "egress_sns_topic_arn" {
+  description = "ARN of the egress notification SNS topic (null when disabled)."
+  value       = module.file_router.egress_sns_topic_arn
+}
+
+################################################################################
+# Audit Trail
+################################################################################
+
+output "audit_trail_table_arn" {
+  description = "ARN of the audit trail DynamoDB table (null when disabled)."
+  value       = module.file_router.audit_trail_table_arn
+}
+
+output "audit_trail_table_name" {
+  description = "Name of the audit trail DynamoDB table (null when disabled)."
+  value       = module.file_router.audit_trail_table_name
+}
+
+################################################################################
 # Prompt Injection Scanner
 ################################################################################
+
+output "virustotal_scanner_function_arn" {
+  description = "ARN of the VirusTotal scanner Lambda function (null when scanning is disabled)."
+  value       = var.enable_virustotal_scanning ? aws_lambda_function.virustotal_scanner[0].arn : null
+}
 
 output "prompt_injection_scanner_function_arn" {
   description = "ARN of the prompt injection scanner Lambda function (null when scanning is disabled)."

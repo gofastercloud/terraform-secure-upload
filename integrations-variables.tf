@@ -149,18 +149,19 @@ variable "servicenow_instance_url" {
   }
 }
 
-variable "servicenow_credentials_secret_arn" {
-  description = "ARN of an AWS Secrets Manager secret containing ServiceNow credentials (JSON with 'username' and 'password' keys). Required when enable_servicenow_integration is true."
+variable "servicenow_credentials" {
+  description = "JSON string containing ServiceNow credentials (keys: 'username' and 'password'). Stored as an SSM SecureString parameter. Required when enable_servicenow_integration is true."
   type        = string
   default     = null
+  sensitive   = true
 
   validation {
-    condition     = !var.enable_servicenow_integration || var.servicenow_credentials_secret_arn != null
-    error_message = "servicenow_credentials_secret_arn is required when enable_servicenow_integration is true."
+    condition     = !var.enable_servicenow_integration || var.servicenow_credentials != null
+    error_message = "servicenow_credentials is required when enable_servicenow_integration is true."
   }
 
   validation {
-    condition     = var.servicenow_credentials_secret_arn == null || can(regex("^arn:aws:secretsmanager:", var.servicenow_credentials_secret_arn))
-    error_message = "servicenow_credentials_secret_arn must be a valid Secrets Manager ARN."
+    condition     = var.servicenow_credentials == null || can(jsondecode(var.servicenow_credentials))
+    error_message = "servicenow_credentials must be a valid JSON string."
   }
 }
