@@ -27,12 +27,15 @@ This module follows AWS security best practices by default:
 
 - **Encryption at rest** — All S3 buckets use KMS server-side encryption with bucket keys enabled.
 - **Encryption in transit** — Bucket policies deny any request made over plain HTTP (`aws:SecureTransport = false`).
+- **KMS enforcement in bucket policies** — Bucket policies on the ingress, egress, and quarantine buckets deny `PutObject` requests that don't use KMS encryption (`s3:x-amz-server-side-encryption != aws:kms`) or that use the wrong KMS key (`s3:x-amz-server-side-encryption-aws-kms-key-id != module key ARN`). This prevents uploads encrypted with SSE-S3 or a different KMS key.
 - **Least-privilege IAM** — Each component (Lambda, GuardDuty, Transfer Family, SFTP users) receives a scoped IAM role with only the permissions it needs.
 - **Public access blocked** — All buckets have S3 Block Public Access enabled on every setting.
 - **Bucket ownership enforced** — ACLs are disabled; the bucket owner controls all objects.
 - **Object Lock** — Optional WORM retention on the quarantine bucket for tamper-proof evidence preservation.
 - **SFTP path isolation** — Ingress SFTP users are scoped to a subdirectory via validated `home_directory_prefix` (bare `/` and `..` path traversal are rejected). IAM policies enforce a trailing `/` separator to prevent prefix-overlap attacks.
 - **Dead letter queue** — Failed Lambda invocations are captured in an SQS DLQ so no scan results are silently lost.
+- **Lambda error alarm** — A CloudWatch alarm on the Lambda `Errors` metric fires to the SNS alert topic when invocation errors occur (timeouts, crashes, permission failures), independent of the DLQ depth alarm.
+- **Deletion protection** — The KMS key and quarantine bucket have `prevent_destroy` lifecycle rules to prevent accidental deletion via `terraform destroy` or refactoring. To remove these resources, the lifecycle block must be explicitly removed from the module source first.
 
 ## Caller Security Responsibilities
 

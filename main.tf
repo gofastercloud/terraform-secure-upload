@@ -72,6 +72,10 @@ resource "aws_kms_key" "this" {
     ]
   })
 
+  lifecycle {
+    prevent_destroy = true
+  }
+
   tags = local.default_tags
 }
 
@@ -149,7 +153,7 @@ module "sftp_ingress" {
   source = "./modules/sftp"
   count  = var.enable_sftp_ingress ? 1 : 0
 
-  name_prefix        = var.name_prefix
+  name_prefix        = "${var.name_prefix}-ingress"
   tags               = merge(local.default_tags, { Direction = "ingress" })
   kms_key_arn        = local.kms_key_arn
   create_sftp_server = var.create_sftp_ingress_server

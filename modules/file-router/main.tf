@@ -55,6 +55,28 @@ resource "aws_cloudwatch_metric_alarm" "dlq_messages" {
   tags = var.tags
 }
 
+resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
+  alarm_name          = "${var.name_prefix}-file-router-errors-alarm"
+  alarm_description   = "Alert when file-router Lambda function has invocation errors"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Errors"
+  namespace           = "AWS/Lambda"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 0
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    FunctionName = aws_lambda_function.file_router.function_name
+  }
+
+  alarm_actions = [aws_sns_topic.malware_alerts.arn]
+  ok_actions    = [aws_sns_topic.malware_alerts.arn]
+
+  tags = var.tags
+}
+
 resource "aws_sqs_queue_policy" "dlq" {
   queue_url = aws_sqs_queue.dlq.id
 

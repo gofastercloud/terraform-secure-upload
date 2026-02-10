@@ -68,9 +68,12 @@ A Terraform module that creates a secure file upload pipeline on AWS with automa
 - **S3 Object Lock** — optional tamper-proof retention on the quarantine bucket
 - **Least-privilege IAM** — scoped IAM roles for GuardDuty, Lambda, Transfer Family, and SFTP users
 - **TLS enforcement** — bucket policies deny non-HTTPS requests on all buckets
+- **KMS enforcement** — bucket policies deny uploads that don't use the module's KMS key, preventing wrong-key or SSE-S3 encryption
 - **Access logging** — dedicated log bucket for S3 server access logs
 - **Lifecycle management** — configurable expiration/transition rules per bucket
 - **Dead letter queue** — SQS DLQ for Lambda invocation failures
+- **Lambda error alarm** — CloudWatch alarm on Lambda invocation errors (separate from DLQ), firing to the SNS alert topic
+- **Deletion protection** — `prevent_destroy` lifecycle on the KMS key and quarantine bucket to guard against accidental data loss
 
 ## Prerequisites
 
@@ -224,7 +227,7 @@ module "secure_upload" {
 
 | Name | Description | Type | Default | Required |
 |---|---|---|---|---|
-| `sns_subscription_emails` | Email addresses subscribed to the malware-alert SNS topic. | `list(string)` | `[]` | no |
+| `sns_subscription_emails` | Email addresses subscribed to the malware-alert SNS topic. Each entry is validated as a well-formed email address. | `list(string)` | `[]` | no |
 
 ### Quarantine — Object Lock
 

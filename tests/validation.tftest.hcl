@@ -596,3 +596,35 @@ run "egress_vpc_missing_allowed_cidrs" {
     var.sftp_egress_allowed_cidrs,
   ]
 }
+
+################################################################################
+# Test: Invalid email in sns_subscription_emails fails
+################################################################################
+
+run "invalid_sns_email" {
+  command = plan
+
+  variables {
+    name_prefix             = "test-val"
+    enable_sftp_ingress     = false
+    sns_subscription_emails = ["not-an-email"]
+  }
+
+  expect_failures = [
+    var.sns_subscription_emails,
+  ]
+}
+
+################################################################################
+# Test: Valid emails in sns_subscription_emails pass
+################################################################################
+
+run "valid_sns_emails" {
+  command = plan
+
+  variables {
+    name_prefix             = "test-val"
+    enable_sftp_ingress     = false
+    sns_subscription_emails = ["admin@example.com", "ops@corp.co.uk"]
+  }
+}

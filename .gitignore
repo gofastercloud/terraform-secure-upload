@@ -20,3 +20,6 @@
 # Go test binaries
 test/*.test
 test/vendor/
+
+# Change requests
+plans/
