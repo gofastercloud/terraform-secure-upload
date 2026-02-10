@@ -462,16 +462,16 @@ resource "aws_cloudwatch_dashboard" "pipeline" {
           width  = 12
           height = 6
           properties = {
-            title  = "Routing Summary (24h)"
+            title  = "Routing Summary"
             region = data.aws_region.current.name
             metrics = [
               [local.dashboard_namespace, "FilesRoutedToEgress", { label = "Egress", color = "#2ca02c" }],
               [local.dashboard_namespace, "FilesQuarantined", { label = "Quarantined", color = "#d62728" }],
               [local.dashboard_namespace, "FilesLeftForReview", { label = "Review", color = "#ff7f0e" }],
             ]
-            view   = "singleValue"
-            period = 86400
-            stat   = "Sum"
+            view                 = "singleValue"
+            setPeriodToTimeRange = true
+            stat                 = "Sum"
           }
         },
         {
@@ -542,15 +542,15 @@ resource "aws_cloudwatch_dashboard" "pipeline" {
           width  = 12
           height = 6
           properties = {
-            title  = "Prompt Injection Summary (24h)"
+            title  = "Prompt Injection Summary"
             region = data.aws_region.current.name
             metrics = [
               [local.dashboard_namespace, "PromptInjectionScans", { label = "Files Scanned", color = "#1f77b4" }],
               [local.dashboard_namespace, "PromptInjectionDetections", { label = "Injections Detected", color = "#d62728" }],
             ]
-            view   = "singleValue"
-            period = 86400
-            stat   = "Sum"
+            view                 = "singleValue"
+            setPeriodToTimeRange = true
+            stat                 = "Sum"
           }
         },
       ] : [],
