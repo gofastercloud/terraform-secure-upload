@@ -533,6 +533,8 @@ resource "aws_cloudwatch_dashboard" "pipeline" {
             stat    = "Sum"
           }
         },
+      ] : [],
+      var.prompt_injection_scanner_function_name != null ? [
         {
           type   = "metric"
           x      = 12
@@ -551,6 +553,8 @@ resource "aws_cloudwatch_dashboard" "pipeline" {
             stat   = "Sum"
           }
         },
+      ] : [],
+      var.prompt_injection_scanner_function_name != null ? [
         {
           type   = "metric"
           x      = 0
