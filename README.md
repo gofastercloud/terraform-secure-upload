@@ -73,6 +73,7 @@ A Terraform module that creates a secure file upload pipeline on AWS with automa
 - **Lifecycle management** — configurable expiration/transition rules per bucket
 - **Dead letter queue** — SQS DLQ for Lambda invocation failures
 - **Lambda error alarm** — CloudWatch alarm on Lambda invocation errors (separate from DLQ), firing to the SNS alert topic
+- **CloudWatch dashboard** — optional pipeline dashboard with metric filters for file routing outcomes, Lambda health, DLQ depth, and S3 bucket metrics
 - **Deletion protection** — `prevent_destroy` lifecycle on the KMS key and quarantine bucket to guard against accidental data loss
 
 ## Prerequisites
@@ -237,6 +238,12 @@ module "secure_upload" {
 | `object_lock_retention_days` | Default retention period in days for Object Lock on the quarantine bucket. | `number` | `365` | no |
 | `object_lock_retention_mode` | Object Lock retention mode — `GOVERNANCE` or `COMPLIANCE`. | `string` | `"GOVERNANCE"` | no |
 
+### Observability
+
+| Name | Description | Type | Default | Required |
+|---|---|---|---|---|
+| `enable_cloudwatch_dashboard` | Create a CloudWatch dashboard with metric filters for pipeline observability. | `bool` | `false` | no |
+
 ### Logging
 
 | Name | Description | Type | Default | Required |
@@ -270,6 +277,7 @@ module "secure_upload" {
 | `lambda_function_arn` | ARN of the file-router Lambda function. |
 | `dlq_arn` | ARN of the file-router Lambda dead letter queue. |
 | `eventbridge_rule_arn` | ARN of the EventBridge rule for GuardDuty scan results. |
+| `cloudwatch_dashboard_arn` | ARN of the CloudWatch pipeline dashboard (null when disabled). |
 
 ## Submodules
 

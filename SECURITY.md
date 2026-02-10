@@ -35,6 +35,7 @@ This module follows AWS security best practices by default:
 - **SFTP path isolation** — Ingress SFTP users are scoped to a subdirectory via validated `home_directory_prefix` (bare `/` and `..` path traversal are rejected). IAM policies enforce a trailing `/` separator to prevent prefix-overlap attacks.
 - **Dead letter queue** — Failed Lambda invocations are captured in an SQS DLQ so no scan results are silently lost.
 - **Lambda error alarm** — A CloudWatch alarm on the Lambda `Errors` metric fires to the SNS alert topic when invocation errors occur (timeouts, crashes, permission failures), independent of the DLQ depth alarm.
+- **CloudWatch dashboard** — Optional metric filters and dashboard for pipeline observability. The metric filters operate on the existing Lambda log group and do not require additional IAM permissions beyond what the Lambda already has for CloudWatch Logs.
 - **Deletion protection** — The KMS key and quarantine bucket have `prevent_destroy` lifecycle rules to prevent accidental deletion via `terraform destroy` or refactoring. To remove these resources, the lifecycle block must be explicitly removed from the module source first.
 
 ## Caller Security Responsibilities

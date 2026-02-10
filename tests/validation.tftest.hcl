@@ -628,3 +628,21 @@ run "valid_sns_emails" {
     sns_subscription_emails = ["admin@example.com", "ops@corp.co.uk"]
   }
 }
+
+################################################################################
+# Test: CloudWatch dashboard disabled by default
+################################################################################
+
+run "dashboard_disabled_by_default" {
+  command = plan
+
+  variables {
+    name_prefix         = "test-val"
+    enable_sftp_ingress = false
+  }
+
+  assert {
+    condition     = output.cloudwatch_dashboard_arn == null
+    error_message = "Dashboard ARN should be null when enable_cloudwatch_dashboard is false"
+  }
+}

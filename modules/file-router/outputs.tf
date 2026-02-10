@@ -22,3 +22,8 @@ output "eventbridge_rule_arn" {
   description = "ARN of the EventBridge rule for scan results"
   value       = aws_cloudwatch_event_rule.scan_result.arn
 }
+
+output "cloudwatch_dashboard_arn" {
+  description = "ARN of the CloudWatch dashboard (null when disabled)"
+  value       = var.enable_cloudwatch_dashboard ? aws_cloudwatch_dashboard.pipeline[0].dashboard_arn : null
+}

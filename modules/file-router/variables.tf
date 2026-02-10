@@ -85,3 +85,9 @@ variable "log_retention_days" {
   type        = number
   default     = 90
 }
+
+variable "enable_cloudwatch_dashboard" {
+  description = "Create a CloudWatch dashboard with metric filters for pipeline observability."
+  type        = bool
+  default     = false
+}
