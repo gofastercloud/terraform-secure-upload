@@ -60,19 +60,19 @@ variable "kms_key_arn" {
 ################################################################################
 
 variable "enable_sftp_ingress" {
-  description = "Whether to enable the SFTP upload path via AWS Transfer Family."
+  description = "Enable the SFTP upload path via AWS Transfer Family. When false (default), no Transfer Family resources are created for ingress."
   type        = bool
   default     = false
 }
 
 variable "create_sftp_server" {
-  description = "Create a new Transfer Family server. Set false to attach to an existing server."
+  description = "Create a new Transfer Family server for ingress. Only takes effect when enable_sftp_ingress is true. Set to false to attach users to an existing server via sftp_server_id."
   type        = bool
   default     = true
 }
 
 variable "sftp_server_id" {
-  description = "Existing Transfer Family server ID. Required when enable_sftp_ingress is true and create_sftp_server is false."
+  description = "ID of an existing Transfer Family server to attach ingress users to. Only used when enable_sftp_ingress is true and create_sftp_server is false."
   type        = string
   default     = null
 
@@ -83,7 +83,7 @@ variable "sftp_server_id" {
 }
 
 variable "sftp_endpoint_type" {
-  description = "Transfer Family endpoint type — PUBLIC or VPC."
+  description = "Transfer Family endpoint type for ingress — PUBLIC or VPC. Only used when enable_sftp_ingress and create_sftp_server are both true."
   type        = string
   default     = "PUBLIC"
 
@@ -94,25 +94,25 @@ variable "sftp_endpoint_type" {
 }
 
 variable "sftp_vpc_id" {
-  description = "VPC ID for a VPC-type Transfer Family endpoint."
+  description = "VPC ID for a VPC-type ingress Transfer Family endpoint. Required when sftp_endpoint_type is VPC."
   type        = string
   default     = null
 }
 
 variable "sftp_subnet_ids" {
-  description = "Subnet IDs for a VPC-type Transfer Family endpoint."
+  description = "Subnet IDs for a VPC-type ingress Transfer Family endpoint. Required when sftp_endpoint_type is VPC."
   type        = list(string)
   default     = []
 }
 
 variable "sftp_allowed_cidrs" {
-  description = "CIDR blocks allowed to access the SFTP server (VPC security group). Required for VPC endpoint type."
+  description = "CIDR blocks allowed to access the ingress SFTP server security group. Required when sftp_endpoint_type is VPC."
   type        = list(string)
   default     = []
 }
 
 variable "sftp_users" {
-  description = "SFTP users to provision on the Transfer Family server. Each home_directory_prefix must be a real path (not bare /) starting and ending with /."
+  description = "Ingress SFTP users to provision. Each home_directory_prefix scopes the user to a subdirectory (must start and end with /, e.g. /uploads/partner-a/). A bare / is not allowed for ingress."
   type = list(object({
     username              = string
     ssh_public_key        = string
@@ -142,19 +142,19 @@ variable "sftp_users" {
 ################################################################################
 
 variable "enable_sftp_egress" {
-  description = "Whether to enable an egress SFTP endpoint for the egress bucket (read-only)."
+  description = "Enable an egress SFTP endpoint for read-only access to the egress bucket. When false (default), no Transfer Family resources are created for egress."
   type        = bool
   default     = false
 }
 
 variable "create_sftp_egress_server" {
-  description = "Create a new Transfer Family server for egress. Set false to attach to an existing server."
+  description = "Create a new Transfer Family server for egress. Only takes effect when enable_sftp_egress is true. Set to false to attach users to an existing server via sftp_egress_server_id."
   type        = bool
   default     = true
 }
 
 variable "sftp_egress_server_id" {
-  description = "Existing Transfer Family server ID for egress. Required when enable_sftp_egress is true and create_sftp_egress_server is false."
+  description = "ID of an existing Transfer Family server to attach egress users to. Only used when enable_sftp_egress is true and create_sftp_egress_server is false."
   type        = string
   default     = null
 
@@ -165,7 +165,7 @@ variable "sftp_egress_server_id" {
 }
 
 variable "sftp_egress_endpoint_type" {
-  description = "Transfer Family endpoint type for egress — PUBLIC or VPC."
+  description = "Transfer Family endpoint type for egress — PUBLIC or VPC. Only used when enable_sftp_egress and create_sftp_egress_server are both true."
   type        = string
   default     = "PUBLIC"
 
@@ -176,25 +176,25 @@ variable "sftp_egress_endpoint_type" {
 }
 
 variable "sftp_egress_vpc_id" {
-  description = "VPC ID for a VPC-type egress Transfer Family endpoint."
+  description = "VPC ID for a VPC-type egress Transfer Family endpoint. Required when sftp_egress_endpoint_type is VPC."
   type        = string
   default     = null
 }
 
 variable "sftp_egress_subnet_ids" {
-  description = "Subnet IDs for a VPC-type egress Transfer Family endpoint."
+  description = "Subnet IDs for a VPC-type egress Transfer Family endpoint. Required when sftp_egress_endpoint_type is VPC."
   type        = list(string)
   default     = []
 }
 
 variable "sftp_egress_allowed_cidrs" {
-  description = "CIDR blocks allowed to access the egress SFTP server (VPC security group)."
+  description = "CIDR blocks allowed to access the egress SFTP server security group. Required when sftp_egress_endpoint_type is VPC."
   type        = list(string)
   default     = []
 }
 
 variable "sftp_egress_users" {
-  description = "SFTP users for egress (read-only access to egress bucket)."
+  description = "Egress SFTP users with read-only access to the egress bucket. home_directory_prefix defaults to / (full bucket); set to a subdirectory (e.g. /outbound/partner/) to scope access."
   type = list(object({
     username              = string
     ssh_public_key        = string
