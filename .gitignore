@@ -44,3 +44,8 @@ crash.log
 *.key
 *.p12
 *.pfx
+
+# Generated test files (keep the generator script, ignore outputs)
+test-files/*.txt
+test-files/*.pdf
+test-files/*.docx
