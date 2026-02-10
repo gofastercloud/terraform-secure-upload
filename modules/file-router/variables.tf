@@ -98,6 +98,12 @@ variable "prompt_injection_scanner_function_arn" {
   default     = null
 }
 
+variable "prompt_injection_scanner_function_name" {
+  description = "Name of the prompt injection scanner Lambda function (for dashboard metrics). Null when scanning is disabled."
+  type        = string
+  default     = null
+}
+
 variable "prompt_injection_threshold" {
   description = "Score threshold (0–100) above which a file is quarantined for prompt injection."
   type        = number
