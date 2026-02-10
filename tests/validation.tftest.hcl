@@ -18,7 +18,7 @@ run "invalid_endpoint_type" {
 
   variables {
     name_prefix         = "test-val"
-    enable_sftp_ingress = true
+    enable_sftp_ingress = false
     sftp_endpoint_type  = "INVALID"
   }
 
