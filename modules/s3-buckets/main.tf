@@ -98,6 +98,39 @@ resource "aws_s3_bucket" "ingress" {
   tags   = var.tags
 }
 
+resource "aws_s3_bucket_versioning" "ingress" {
+  bucket = aws_s3_bucket.ingress.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "ingress" {
+  bucket = aws_s3_bucket.ingress.id
+
+  rule {
+    id     = "expire-ingress-objects-and-versions"
+    status = "Enabled"
+
+    filter {
+      prefix = ""
+    }
+
+    expiration {
+      days = var.ingress_object_expiration_days
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = var.ingress_noncurrent_version_expiration_days
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
+    }
+  }
+}
+
 resource "aws_s3_bucket_server_side_encryption_configuration" "ingress" {
   bucket = aws_s3_bucket.ingress.id
 

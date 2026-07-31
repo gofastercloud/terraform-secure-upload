@@ -36,6 +36,8 @@ def handler(event, context):
         raise ValueError("GuardDuty scan result did not contain a bucket, key, and result status")
     if source_bucket != INGRESS_BUCKET:
         raise ValueError(f"Unexpected scan bucket: {source_bucket}")
+    if not isinstance(version_id, str) or not version_id or version_id == "null":
+        raise ValueError("GuardDuty scan result did not contain a usable object version ID")
 
     file_size = _get_file_size(source_bucket, object_key, version_id)
     logger.info(
@@ -61,6 +63,7 @@ def handler(event, context):
         "status_reasons": scan_result_details.get("statusReasons") or [],
         "threats": scan_result_details.get("threats") or [],
         "file_key": object_key,
+        "version_id": version_id,
         "source_bucket": source_bucket,
         "destination_bucket": destination_bucket,
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -80,16 +83,11 @@ def handler(event, context):
 
 
 def _get_file_size(bucket, key, version_id):
-    arguments = {"Bucket": bucket, "Key": key}
-    if version_id:
-        arguments["VersionId"] = version_id
-    return s3.head_object(**arguments).get("ContentLength", 0)
+    return s3.head_object(Bucket=bucket, Key=key, VersionId=version_id).get("ContentLength", 0)
 
 
 def _copy_object(source_bucket, key, version_id, destination_bucket):
-    copy_source = {"Bucket": source_bucket, "Key": key}
-    if version_id:
-        copy_source["VersionId"] = version_id
+    copy_source = {"Bucket": source_bucket, "Key": key, "VersionId": version_id}
 
     s3.copy_object(
         CopySource=copy_source,
@@ -100,12 +98,16 @@ def _copy_object(source_bucket, key, version_id, destination_bucket):
         SSEKMSKeyId=KMS_KEY_ARN,
         BucketKeyEnabled=True,
     )
-    logger.info("Copied s3://%s/%s to s3://%s/%s", source_bucket, key, destination_bucket, key)
+    logger.info(
+        "Copied s3://%s/%s version=%s to s3://%s/%s",
+        source_bucket,
+        key,
+        version_id,
+        destination_bucket,
+        key,
+    )
 
 
 def _delete_object(bucket, key, version_id):
-    arguments = {"Bucket": bucket, "Key": key}
-    if version_id:
-        arguments["VersionId"] = version_id
-    s3.delete_object(**arguments)
+    s3.delete_object(Bucket=bucket, Key=key, VersionId=version_id)
     logger.info("Deleted source version s3://%s/%s version=%s", bucket, key, version_id)

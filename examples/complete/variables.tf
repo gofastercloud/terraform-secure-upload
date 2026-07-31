@@ -72,7 +72,7 @@ variable "sftp_route53_hosted_zone_id" {
 }
 
 variable "sftp_users" {
-  description = "SFTP users with distinct logical home prefixes."
+  description = "SFTP users with disjoint logical home prefixes."
   type = list(object({
     username              = string
     ssh_public_key        = string

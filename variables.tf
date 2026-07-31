@@ -120,7 +120,7 @@ variable "sftp_route53_hosted_zone_id" {
 }
 
 variable "sftp_users" {
-  description = "Service-managed SFTP users. Each user is restricted to a distinct logical home prefix."
+  description = "Service-managed SFTP users. Each user is restricted to a disjoint logical home prefix."
   type = list(object({
     username              = string
     ssh_public_key        = string
@@ -150,8 +150,44 @@ variable "sftp_users" {
   }
 
   validation {
-    condition     = length(distinct([for user in var.sftp_users : user.home_directory_prefix])) == length(var.sftp_users)
-    error_message = "Each SFTP user must have a distinct home_directory_prefix to avoid overlapping access and hot S3 prefixes."
+    condition = alltrue([
+      for index, user in var.sftp_users : alltrue([
+        for other_index, other in var.sftp_users : index == other_index || !(
+          trimsuffix(trimprefix(user.home_directory_prefix, "/"), "/") == trimsuffix(trimprefix(other.home_directory_prefix, "/"), "/") ||
+          startswith(
+            trimsuffix(trimprefix(user.home_directory_prefix, "/"), "/"),
+            format("%s/", trimsuffix(trimprefix(other.home_directory_prefix, "/"), "/")),
+          ) ||
+          startswith(
+            trimsuffix(trimprefix(other.home_directory_prefix, "/"), "/"),
+            format("%s/", trimsuffix(trimprefix(user.home_directory_prefix, "/"), "/")),
+          )
+        )
+      ])
+    ])
+    error_message = "SFTP home_directory_prefix values must be disjoint; ancestor and descendant prefixes are not allowed."
+  }
+}
+
+variable "ingress_object_expiration_days" {
+  description = "Number of days before an unprocessed current ingress object expires."
+  type        = number
+  default     = 7
+
+  validation {
+    condition     = var.ingress_object_expiration_days > 0
+    error_message = "ingress_object_expiration_days must be positive."
+  }
+}
+
+variable "ingress_noncurrent_version_expiration_days" {
+  description = "Number of days before a noncurrent ingress object version expires."
+  type        = number
+  default     = 7
+
+  validation {
+    condition     = var.ingress_noncurrent_version_expiration_days > 0
+    error_message = "ingress_noncurrent_version_expiration_days must be positive."
   }
 }
 

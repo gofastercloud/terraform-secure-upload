@@ -14,6 +14,8 @@ Transfer Family S3 directory listing optimization is enabled, so logical home di
 
 The ingress bucket deliberately disables S3 Bucket Keys so KMS receives the individual S3 object ARN as its encryption context. Each SFTP user can therefore use the shared CMK only for objects below that user's logical home prefix, in addition to the normal S3 IAM restriction. Clean and quarantine buckets retain S3 Bucket Keys because SFTP users do not access them.
 
+Ingress versioning binds each malware-scan verdict to the exact object version that GuardDuty inspected. The scan router rejects events without a usable version ID and never falls back to the current key. Ingress current objects and noncurrent versions expire using `ingress_object_expiration_days` and `ingress_noncurrent_version_expiration_days`; the defaults are 7 days for each.
+
 ## Usage
 
 ```hcl
@@ -40,7 +42,7 @@ module "secure_upload" {
 }
 ```
 
-Use distinct user prefixes such as `/uploads/partner-a/` and `/uploads/partner-b/`. This both isolates IAM access and distributes S3 request load across prefixes. S3 prefixes are virtual, and Transfer Family S3 directory listing optimization allows these logical homes to operate without placeholder objects at startup.
+Use disjoint user prefixes such as `/uploads/partner-a/` and `/uploads/partner-b/`; ancestor/descendant pairs such as `/uploads/partner/` and `/uploads/partner/acme/` are rejected. This both isolates IAM access and distributes S3 request load across prefixes. S3 prefixes are virtual, and Transfer Family S3 directory listing optimization allows these logical homes to operate without placeholder objects at startup.
 
 All taggable resources receive the supplied `tags` plus `Module=terraform-secure-upload` and `ManagedBy=terraform`. AWS resources without tag support, such as KMS aliases, IAM inline policies, and Route 53 records, cannot receive tags.
 
@@ -51,7 +53,7 @@ All taggable resources receive the supplied `tags` plus `Module=terraform-secure
 - Supply SSH public keys only. Private keys remain with the client.
 - Subscribe downstream consumers to the exported `sns_topic_arn`.
 - If using a custom hostname with an external DNS provider, create a CNAME from that hostname to the Transfer Family VPC endpoint DNS name. Supplying `sftp_route53_hosted_zone_id` makes the module create the Route 53 record instead.
-- Configure S3 retention and archival policies in the consuming stack.
+- Configure clean and quarantine retention and archival policies in the consuming stack. Ingress current objects and noncurrent versions expire using `ingress_object_expiration_days` and `ingress_noncurrent_version_expiration_days`.
 - If supplying `kms_key_arn`, its key policy must permit the AWS services and roles created by the module to use the key.
 - Do not grant SFTP user roles broad standalone KMS permissions. Their KMS permissions are intentionally constrained to S3 requests whose encryption context matches their home prefix.
 

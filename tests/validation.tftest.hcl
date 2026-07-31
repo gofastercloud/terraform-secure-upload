@@ -145,3 +145,30 @@ run "sftp_rejects_path_traversal" {
 
   expect_failures = [var.sftp_users]
 }
+
+run "sftp_rejects_overlapping_home_prefixes" {
+  command = plan
+
+  variables {
+    name_prefix                 = "test-val"
+    enable_sftp                 = true
+    sftp_vpc_id                 = "vpc-12345678"
+    sftp_subnet_ids             = ["subnet-a"]
+    sftp_address_allocation_ids = ["eipalloc-a"]
+    sftp_allowed_cidrs          = ["203.0.113.10/32"]
+    sftp_users = [
+      {
+        username              = "partner"
+        ssh_public_key        = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexample partner@example.com"
+        home_directory_prefix = "/uploads/partner/"
+      },
+      {
+        username              = "partner-acme"
+        ssh_public_key        = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexample partner-acme@example.com"
+        home_directory_prefix = "/uploads/partner/acme/"
+      }
+    ]
+  }
+
+  expect_failures = [var.sftp_users]
+}

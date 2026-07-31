@@ -82,6 +82,9 @@ module "s3_buckets" {
   name_prefix = var.name_prefix
   tags        = local.default_tags
   kms_key_arn = local.kms_key_arn
+
+  ingress_object_expiration_days             = var.ingress_object_expiration_days
+  ingress_noncurrent_version_expiration_days = var.ingress_noncurrent_version_expiration_days
 }
 
 module "guardduty_protection" {

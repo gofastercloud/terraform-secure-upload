@@ -31,6 +31,16 @@ run "bucket_security" {
   }
 
   assert {
+    condition     = aws_s3_bucket_versioning.ingress.versioning_configuration[0].status == "Enabled"
+    error_message = "Ingress bucket versioning must be enabled to bind scan results to exact object versions"
+  }
+
+  assert {
+    condition     = one(aws_s3_bucket_lifecycle_configuration.ingress.rule).expiration[0].days == 7 && one(aws_s3_bucket_lifecycle_configuration.ingress.rule).noncurrent_version_expiration[0].noncurrent_days == 7
+    error_message = "Ingress current and noncurrent object versions must have bounded retention"
+  }
+
+  assert {
     condition     = one(aws_s3_bucket_server_side_encryption_configuration.egress.rule).bucket_key_enabled
     error_message = "Clean bucket must have S3 Bucket Keys enabled"
   }
