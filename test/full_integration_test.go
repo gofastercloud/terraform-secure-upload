@@ -31,6 +31,7 @@ const eicarTestString = `X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TE
 type fullIntegrationConfig struct {
 	Region           string
 	TestID           string
+	KMSKeyARN        string
 	VPCID            string
 	SubnetIDs        []string
 	EIPAllocationIDs []string
@@ -120,17 +121,28 @@ func TestFullIntegration(t *testing.T) {
 	monitor := (*notificationMonitor)(nil)
 	var terraformOptions *terraform.Options
 	var kmsKey, kmsAlias string
+	var kmsKeyOwned bool
 	var allocatedEIPs []string
 	defer func() {
-		cleanupIntegration(t, report, terraformOptions, resources, monitor, kmsKey, kmsAlias, allocatedEIPs, sess)
+		cleanupIntegration(t, report, terraformOptions, resources, monitor, kmsKey, kmsAlias, kmsKeyOwned, allocatedEIPs, sess)
 	}()
 
-	kmsKey, kmsAlias, err = createIntegrationKMSKey(ctx, kms.New(sess), config.Region, aws.StringValue(identity.Account), config.TestID)
-	if err != nil {
-		report.add("test-kms-key", "FAIL", err.Error(), 0)
-		t.Fatal(err)
+	if config.KMSKeyARN != "" {
+		kmsKey = config.KMSKeyARN
+		if err := validateIntegrationKMSKey(ctx, kms.New(sess), kmsKey, config.Region, aws.StringValue(identity.Account)); err != nil {
+			report.add("test-kms-key", "FAIL", err.Error(), 0)
+			t.Fatal(err)
+		}
+		report.add("test-kms-key", "PASS", "reusing existing KMS key "+kmsKey, 0)
+	} else {
+		kmsKey, kmsAlias, err = createIntegrationKMSKey(ctx, kms.New(sess), config.Region, aws.StringValue(identity.Account), config.TestID)
+		if err != nil {
+			report.add("test-kms-key", "FAIL", err.Error(), 0)
+			t.Fatal(err)
+		}
+		kmsKeyOwned = true
+		report.add("test-kms-key", "PASS", kmsKey, 0)
 	}
-	report.add("test-kms-key", "PASS", kmsKey, 0)
 
 	config.EIPAllocationIDs, allocatedEIPs, err = ensureIntegrationEIPs(ctx, ec2.New(sess), config)
 	if err != nil {
@@ -522,6 +534,13 @@ func loadFullIntegrationConfig() (fullIntegrationConfig, error) {
 	if region == "" {
 		region = "us-east-1"
 	}
+	kmsKeyARN := strings.TrimSpace(os.Getenv("TEST_KMS_KEY_ARN"))
+	if kmsKeyARN != "" {
+		parts := strings.Split(kmsKeyARN, ":")
+		if len(parts) != 6 || parts[0] != "arn" || parts[2] != "kms" || !strings.HasPrefix(parts[5], "key/") {
+			return fullIntegrationConfig{}, fmt.Errorf("TEST_KMS_KEY_ARN must be a full KMS key ARN, not an alias ARN")
+		}
+	}
 	vpcID, err := value("TEST_SFTP_VPC_ID")
 	if err != nil {
 		return fullIntegrationConfig{}, err
@@ -551,6 +570,7 @@ func loadFullIntegrationConfig() (fullIntegrationConfig, error) {
 	return fullIntegrationConfig{
 		Region:           region,
 		TestID:           testID,
+		KMSKeyARN:        kmsKeyARN,
 		VPCID:            vpcID,
 		SubnetIDs:        subnets,
 		EIPAllocationIDs: eips,
@@ -602,6 +622,25 @@ func mustJSONUsers(t *testing.T, users []integrationUser) string {
 	return string(encoded)
 }
 
+func validateIntegrationKMSKey(ctx context.Context, client *kms.KMS, keyARN, region, account string) error {
+	parts := strings.Split(keyARN, ":")
+	if len(parts) != 6 || parts[0] != "arn" || parts[2] != "kms" || parts[3] != region || parts[4] != account || !strings.HasPrefix(parts[5], "key/") {
+		return fmt.Errorf("TEST_KMS_KEY_ARN must be a full KMS key ARN in account %s and Region %s", account, region)
+	}
+
+	described, err := client.DescribeKeyWithContext(ctx, &kms.DescribeKeyInput{KeyId: aws.String(keyARN)})
+	if err != nil {
+		return fmt.Errorf("describe existing KMS key: %w", err)
+	}
+	if described.KeyMetadata == nil || aws.StringValue(described.KeyMetadata.Arn) != keyARN {
+		return fmt.Errorf("existing KMS key ARN did not resolve to %s", keyARN)
+	}
+	if aws.StringValue(described.KeyMetadata.KeyState) != kms.KeyStateEnabled {
+		return fmt.Errorf("existing KMS key %s is not enabled", keyARN)
+	}
+	return nil
+}
+
 func createIntegrationKMSKey(ctx context.Context, client *kms.KMS, region, account, testID string) (string, string, error) {
 	policy := map[string]interface{}{
 		"Version": "2012-10-17",
@@ -613,7 +652,7 @@ func createIntegrationKMSKey(ctx context.Context, client *kms.KMS, region, accou
 			},
 			map[string]interface{}{
 				"Sid": "AllowSecureUploadServices", "Effect": "Allow",
-				"Principal": map[string]interface{}{"Service": []string{"guardduty.amazonaws.com", "lambda.amazonaws.com", "s3.amazonaws.com", "sns.amazonaws.com", "transfer.amazonaws.com"}},
+				"Principal": map[string]interface{}{"Service": []string{"events.amazonaws.com", "guardduty.amazonaws.com", "lambda.amazonaws.com", "s3.amazonaws.com", "sns.amazonaws.com", "sqs.amazonaws.com", "transfer.amazonaws.com"}},
 				"Action":    []string{"kms:Decrypt", "kms:DescribeKey", "kms:Encrypt", "kms:GenerateDataKey*", "kms:ReEncrypt*"}, "Resource": "*",
 				"Condition": map[string]interface{}{"StringEquals": map[string]string{"aws:SourceAccount": account}},
 			},
@@ -738,7 +777,7 @@ func runSFTPBatch(ctx context.Context, host, user, privateKey string, commands [
 	return string(output), nil
 }
 
-func cleanupIntegration(t *testing.T, report *integrationReport, options *terraform.Options, resources integrationResources, monitor *notificationMonitor, kmsKey, kmsAlias string, allocatedEIPs []string, sess *session.Session) {
+func cleanupIntegration(t *testing.T, report *integrationReport, options *terraform.Options, resources integrationResources, monitor *notificationMonitor, kmsKey, kmsAlias string, kmsKeyOwned bool, allocatedEIPs []string, sess *session.Session) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
@@ -775,20 +814,23 @@ func cleanupIntegration(t *testing.T, report *integrationReport, options *terraf
 	}
 
 	kmsClient := kms.New(sess)
-	if kmsAlias != "" {
+	if kmsKeyOwned && kmsAlias != "" {
 		if _, err := kmsClient.DeleteAliasWithContext(ctx, &kms.DeleteAliasInput{AliasName: aws.String(kmsAlias)}); err != nil {
 			report.add("cleanup-kms-alias", "FAIL", err.Error(), 0)
 		} else {
 			report.add("cleanup-kms-alias", "PASS", "temporary KMS alias deleted", 0)
 		}
 	}
-	if kmsKey != "" {
+	if kmsKeyOwned && kmsKey != "" {
 		keyID := kmsKey[strings.LastIndex(kmsKey, "/")+1:]
 		if _, err := kmsClient.ScheduleKeyDeletionWithContext(ctx, &kms.ScheduleKeyDeletionInput{KeyId: aws.String(keyID), PendingWindowInDays: aws.Int64(7)}); err != nil {
 			report.add("cleanup-kms-key", "FAIL", err.Error(), 0)
 		} else {
 			report.add("cleanup-kms-key", "PASS", "temporary KMS key scheduled for deletion", 0)
 		}
+	}
+	if !kmsKeyOwned && kmsKey != "" {
+		report.add("cleanup-kms-key", "PASS", "existing KMS key retained", 0)
 	}
 	if len(allocatedEIPs) > 0 {
 		if err := releaseIntegrationEIPs(ctx, ec2.New(sess), allocatedEIPs); err != nil {

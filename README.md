@@ -78,16 +78,19 @@ Native Terraform tests use a mocked provider and do not create AWS resources. Li
 
 ## Full AWS integration test
 
-The deploy-and-exercise harness creates the S3+SFTP stack, two users, temporary KMS/SQS resources, clean and EICAR-style uploads through S3 and SFTP, logical-home command checks, lateral-movement attempts, SNS assertions, and CloudWatch log checks. It purges test objects, destroys Terraform resources, schedules the temporary KMS key for deletion, and prints a PASS/FAIL/WARN/SKIP report.
+The deploy-and-exercise harness creates the S3+SFTP stack, two users, a temporary KMS key unless `TEST_KMS_KEY_ARN` is supplied, temporary SQS resources, clean and EICAR-style uploads through S3 and SFTP, logical-home command checks, lateral-movement attempts, SNS assertions, and CloudWatch log checks. It purges test objects, destroys Terraform resources, schedules only a harness-created KMS key for deletion, and prints a PASS/FAIL/WARN/SKIP report. A supplied existing key is validated and retained.
 
 Run it from the repository root with AWS credentials for a disposable account:
 
 ```bash
 export RUN_AWS_INTEGRATION=1
+export AWS_PROFILE=ThreatKrew-Playground-Admin
 export AWS_REGION=us-east-1
 export TEST_SFTP_VPC_ID=vpc-0123456789abcdef
 export TEST_SFTP_SUBNET_IDS=subnet-aaa,subnet-bbb
 export TEST_SFTP_ALLOWED_CIDRS=203.0.113.10/32
+# Optional: reuse an enabled full KMS key ARN in the same account and Region.
+# export TEST_KMS_KEY_ARN=arn:aws:kms:us-east-1:123456789012:key/...
 (cd test && go test -v -timeout=30m -run '^TestFullIntegration$')
 ```
 
