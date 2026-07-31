@@ -11,7 +11,7 @@ Thanks for your interest in contributing to `terraform-secure-upload`. This guid
    ```
 3. Make your changes and commit using [Conventional Commits](https://www.conventionalcommits.org/) style:
    ```bash
-   git commit -m "feat: add support for custom log bucket"
+   git commit -m "feat: improve SFTP access controls"
    ```
 
 ## Prerequisites
@@ -21,7 +21,7 @@ Thanks for your interest in contributing to `terraform-secure-upload`. This guid
 | [Docker](https://docs.docker.com/get-docker/) or [OrbStack](https://orbstack.dev/) | Latest |
 | [Make](https://www.gnu.org/software/make/) | Any |
 
-Docker is used to run Terraform checks at the exact version matching CI (`1.9.x`). You do **not** need Terraform installed locally.
+Docker runs Terraform checks at the pinned project version (`1.9.8`). You do **not** need Terraform installed locally.
 
 For running integration tests that create real AWS resources, you also need:
 
@@ -29,6 +29,9 @@ For running integration tests that create real AWS resources, you also need:
 |---|---|
 | AWS CLI | v2 |
 | AWS credentials | configured for a sandbox account |
+| Go | 1.21 or newer |
+| OpenSSH client | `ssh-keygen` and `sftp` on `PATH` |
+| Terraform | `>= 1.9` on `PATH` for the live harness |
 
 ## Development Workflow
 
@@ -51,7 +54,8 @@ Available Makefile targets:
 | `make validate` | Run `terraform init` and `terraform validate` |
 | `make test-validation` | Run validation-only tests (no AWS credentials needed) |
 | `make test` | Run all three above (full CI equivalent) |
-| `make test-all` | Run all test files (requires AWS credentials) |
+| `make test-all` | Run all native Terraform tests with mocked providers |
+| `make test-integration` | Run the opt-in full AWS deploy-and-exercise harness |
 
 Override the Terraform version if needed: `make test TF_VERSION=1.10.0`
 
@@ -71,11 +75,26 @@ terraform test -filter=tests/validation.tftest.hcl
 This project uses Terraform's native test framework. Tests live in the `tests/` directory.
 
 - **`validation.tftest.hcl`** — Variable validation rule tests. Uses `mock_provider` so no AWS credentials are needed. These run in CI on every push/PR.
-- **`basic.tftest.hcl`** — Plan-level module instantiation tests. Requires AWS credentials.
-- **`sftp.tftest.hcl`** — SFTP module plan-level tests. Requires AWS credentials.
-- **`s3_security.tftest.hcl`** — S3 bucket security configuration tests. Requires AWS credentials.
+- **`basic.tftest.hcl`** — S3-only root-module plan test using a mocked provider.
+- **`sftp.tftest.hcl`** — SFTP endpoint and logical-directory plan test using a mocked provider.
+- **`s3_security.tftest.hcl`** — S3 encryption and bucket-security plan test using a mocked provider.
 
-> **Note:** Tests requiring AWS credentials create real resources. Use a sandbox account.
+The native Terraform tests plan resources with a mocked provider and do not create AWS resources. Live integration testing requires a separately configured sandbox account.
+
+### Full AWS integration test
+
+The full harness is opt-in and creates real S3, GuardDuty, Lambda, SNS, SQS, KMS, Transfer Family, VPC security-group, and CloudWatch resources. It exercises S3 and SFTP clean/dirty uploads, logical homes, common SFTP commands, lateral-movement failures, SNS delivery, and CloudWatch logs before cleanup.
+
+```bash
+export RUN_AWS_INTEGRATION=1
+export AWS_REGION=us-east-1
+export TEST_SFTP_VPC_ID=vpc-0123456789abcdef
+export TEST_SFTP_SUBNET_IDS=subnet-aaa,subnet-bbb
+export TEST_SFTP_ALLOWED_CIDRS=203.0.113.10/32
+(cd test && go test -v -timeout=30m -run '^TestFullIntegration$')
+```
+
+The harness allocates and releases tagged temporary EIPs when `TEST_SFTP_EIP_ALLOCATION_IDS` is omitted. Set that variable to reuse existing allocations. Set `TEST_SFTP_CUSTOM_HOSTNAME` and `TEST_SFTP_ROUTE53_HOSTED_ZONE_ID` when testing custom DNS. The command prints the test report and must run only against a disposable AWS account.
 
 ### Documentation
 

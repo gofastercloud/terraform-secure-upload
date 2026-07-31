@@ -1,27 +1,5 @@
-# Complete Example
+# Complete example
 
-Full deployment of `terraform-secure-upload` with all features enabled:
+This example deploys the S3 scanning pipeline with a VPC-hosted, internet-facing Transfer Family SFTP server. Provide a VPC, public subnets, one Elastic IP allocation ID per subnet, approved client CIDRs, and users with distinct logical home prefixes.
 
-- VPC-based SFTP endpoint via AWS Transfer Family
-- Custom KMS key (or auto-created)
-- Multiple SFTP users with isolated home directories
-- Email alerts for malware detections
-- S3 Object Lock on the quarantine bucket
-- Custom Lambda tuning and log retention
-
-## Usage
-
-```bash
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your values
-terraform init
-terraform plan
-terraform apply
-```
-
-## Test SFTP Upload
-
-```bash
-sftp -i ~/.ssh/partner-a partner-a@$(terraform output -raw sftp_ingress_server_endpoint)
-sftp> put test-file.txt /
-```
+Subscribe downstream consumers to the module's `sns_topic_arn` output. Set `sftp_custom_hostname` to use a branded endpoint name and set `sftp_route53_hosted_zone_id` to create its Route 53 CNAME.

@@ -10,33 +10,9 @@ variable "region" {
 }
 
 variable "kms_key_arn" {
-  description = "ARN of an existing KMS key. Set to null to auto-create."
+  description = "ARN of an existing KMS key, or null to create one."
   type        = string
   default     = null
-}
-
-variable "ingress_lifecycle_days" {
-  description = "Days before ingress objects expire."
-  type        = number
-  default     = 1
-}
-
-variable "egress_lifecycle_days" {
-  description = "Days before egress objects transition to IA."
-  type        = number
-  default     = 90
-}
-
-variable "quarantine_lifecycle_days" {
-  description = "Days before quarantine objects expire."
-  type        = number
-  default     = 365
-}
-
-variable "enable_object_lock" {
-  description = "Enable S3 Object Lock on the quarantine bucket."
-  type        = bool
-  default     = true
 }
 
 variable "lambda_memory_size" {
@@ -54,13 +30,7 @@ variable "lambda_timeout" {
 variable "lambda_reserved_concurrency" {
   description = "Lambda reserved concurrency."
   type        = number
-  default     = 20
-}
-
-variable "sns_subscription_emails" {
-  description = "Email addresses for malware alerts."
-  type        = list(string)
-  default     = []
+  default     = -1
 }
 
 variable "log_retention_days" {
@@ -70,44 +40,39 @@ variable "log_retention_days" {
 }
 
 variable "vpc_id" {
-  description = "VPC ID for the SFTP VPC endpoint."
+  description = "VPC ID for the internet-facing SFTP endpoint."
   type        = string
 }
 
 variable "subnet_ids" {
-  description = "Subnet IDs for the SFTP VPC endpoint."
+  description = "Public subnet IDs for the SFTP endpoint."
   type        = list(string)
 }
 
-variable "sftp_ingress_allowed_cidrs" {
-  description = "CIDR blocks allowed to access the ingress SFTP server."
+variable "address_allocation_ids" {
+  description = "Elastic IP allocation IDs, one per SFTP subnet."
   type        = list(string)
 }
 
-variable "sftp_ingress_users" {
-  description = "Ingress SFTP users. home_directory_prefix must start/end with / and contain at least one path component (e.g. /uploads/partner-a/)."
-  type = list(object({
-    username              = string
-    ssh_public_key        = string
-    home_directory_prefix = string
-  }))
-  default = []
+variable "sftp_allowed_cidrs" {
+  description = "Client CIDRs allowed to connect to SFTP."
+  type        = list(string)
 }
 
-variable "enable_sftp_egress" {
-  description = "Enable egress SFTP (read-only access to egress bucket)."
-  type        = bool
-  default     = false
+variable "sftp_custom_hostname" {
+  description = "Optional custom hostname for the SFTP endpoint."
+  type        = string
+  default     = null
 }
 
-variable "create_sftp_egress_server" {
-  description = "Create a new Transfer Family server for egress."
-  type        = bool
-  default     = true
+variable "sftp_route53_hosted_zone_id" {
+  description = "Optional public Route 53 hosted zone ID for the custom hostname CNAME."
+  type        = string
+  default     = null
 }
 
-variable "sftp_egress_users" {
-  description = "Egress SFTP users (read-only). home_directory_prefix must start/end with / (use / for full bucket access)."
+variable "sftp_users" {
+  description = "SFTP users with distinct logical home prefixes."
   type = list(object({
     username              = string
     ssh_public_key        = string

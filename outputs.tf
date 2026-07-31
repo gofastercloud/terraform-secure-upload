@@ -1,186 +1,89 @@
-################################################################################
-# S3 Buckets
-################################################################################
-
 output "ingress_bucket_id" {
-  description = "Name of the ingress (upload) S3 bucket."
+  description = "Name of the S3 upload bucket."
   value       = module.s3_buckets.ingress_bucket_id
 }
 
 output "ingress_bucket_arn" {
-  description = "ARN of the ingress (upload) S3 bucket."
+  description = "ARN of the S3 upload bucket."
   value       = module.s3_buckets.ingress_bucket_arn
 }
 
-output "egress_bucket_id" {
-  description = "Name of the egress (verified) S3 bucket."
-  value       = module.s3_buckets.egress_bucket_id
+output "clean_bucket_id" {
+  description = "Name of the S3 bucket containing objects that passed malware scanning."
+  value       = module.s3_buckets.clean_bucket_id
 }
 
-output "egress_bucket_arn" {
-  description = "ARN of the egress (verified) S3 bucket."
-  value       = module.s3_buckets.egress_bucket_arn
+output "clean_bucket_arn" {
+  description = "ARN of the clean S3 bucket."
+  value       = module.s3_buckets.clean_bucket_arn
 }
 
 output "quarantine_bucket_id" {
-  description = "Name of the quarantine (malware-detected) S3 bucket."
+  description = "Name of the S3 bucket containing quarantined objects."
   value       = module.s3_buckets.quarantine_bucket_id
 }
 
 output "quarantine_bucket_arn" {
-  description = "ARN of the quarantine (malware-detected) S3 bucket."
+  description = "ARN of the quarantine S3 bucket."
   value       = module.s3_buckets.quarantine_bucket_arn
 }
 
 output "log_bucket_id" {
-  description = "Name of the S3 access-log bucket (module-created or external)."
+  description = "Name of the S3 access-log bucket."
   value       = module.s3_buckets.logs_bucket_id
 }
 
 output "log_bucket_arn" {
-  description = "ARN of the S3 access-log bucket (null when using an external bucket)."
+  description = "ARN of the S3 access-log bucket."
   value       = module.s3_buckets.logs_bucket_arn
 }
-
-################################################################################
-# KMS
-################################################################################
 
 output "kms_key_arn" {
   description = "ARN of the KMS key used for encryption."
   value       = local.kms_key_arn
 }
 
-################################################################################
-# SFTP / Transfer Family
-################################################################################
-
-output "sftp_ingress_server_id" {
-  description = "ID of the AWS Transfer Family SFTP server."
-  value       = var.enable_sftp_ingress ? module.sftp_ingress[0].server_id : null
+output "sftp_server_id" {
+  description = "ID of the optional VPC-hosted Transfer Family SFTP server."
+  value       = var.enable_sftp ? module.sftp[0].server_id : null
 }
 
-output "sftp_ingress_server_endpoint" {
-  description = "Endpoint hostname of the AWS Transfer Family SFTP server."
-  value       = var.enable_sftp_ingress ? module.sftp_ingress[0].server_endpoint : null
+output "sftp_server_endpoint" {
+  description = "Endpoint hostname of the optional Transfer Family SFTP server."
+  value       = var.enable_sftp ? module.sftp[0].server_endpoint : null
 }
 
-output "sftp_ingress_user_arns" {
-  description = "Map of ingress SFTP username to Transfer user ARN."
-  value       = var.enable_sftp_ingress ? module.sftp_ingress[0].user_arns : {}
+output "sftp_hostname" {
+  description = "Configured custom SFTP hostname, or the AWS endpoint when no custom hostname is configured."
+  value       = var.enable_sftp ? module.sftp[0].hostname : null
 }
 
-################################################################################
-# SFTP Egress / Transfer Family
-################################################################################
-
-output "sftp_egress_server_id" {
-  description = "ID of the egress AWS Transfer Family SFTP server."
-  value       = var.enable_sftp_egress ? module.sftp_egress[0].server_id : null
+output "sftp_user_arns" {
+  description = "Map of SFTP username to Transfer Family user ARN."
+  value       = var.enable_sftp ? module.sftp[0].user_arns : {}
 }
-
-output "sftp_egress_server_endpoint" {
-  description = "Endpoint hostname of the egress SFTP server."
-  value       = var.enable_sftp_egress ? module.sftp_egress[0].server_endpoint : null
-}
-
-output "sftp_egress_user_arns" {
-  description = "Map of egress SFTP username to Transfer user ARN."
-  value       = var.enable_sftp_egress ? module.sftp_egress[0].user_arns : {}
-}
-
-################################################################################
-# Notifications
-################################################################################
 
 output "sns_topic_arn" {
-  description = "ARN of the SNS topic for malware alert notifications."
+  description = "SNS topic for malware and scan-failure alerts."
   value       = module.file_router.sns_topic_arn
 }
 
-################################################################################
-# GuardDuty
-################################################################################
-
 output "guardduty_protection_plan_arn" {
-  description = "ARN of the GuardDuty Malware Protection plan for the ingress bucket."
+  description = "ARN of the GuardDuty Malware Protection for S3 plan."
   value       = module.guardduty_protection.protection_plan_arn
 }
 
-################################################################################
-# Lambda
-################################################################################
-
 output "lambda_function_arn" {
-  description = "ARN of the file-router Lambda function."
+  description = "ARN of the scan result router Lambda."
   value       = module.file_router.lambda_function_arn
 }
 
-################################################################################
-# Dead Letter Queue
-################################################################################
-
 output "dlq_arn" {
-  description = "ARN of the file-router Lambda dead letter queue."
+  description = "ARN of the scan result router dead-letter queue."
   value       = module.file_router.dlq_arn
 }
-
-################################################################################
-# EventBridge
-################################################################################
 
 output "eventbridge_rule_arn" {
   description = "ARN of the EventBridge rule for GuardDuty scan results."
   value       = module.file_router.eventbridge_rule_arn
-}
-
-################################################################################
-# Observability
-################################################################################
-
-output "cloudwatch_dashboard_arn" {
-  description = "ARN of the CloudWatch pipeline dashboard (null when enable_cloudwatch_dashboard is false)."
-  value       = module.file_router.cloudwatch_dashboard_arn
-}
-
-################################################################################
-# Egress Notifications
-################################################################################
-
-output "egress_sns_topic_arn" {
-  description = "ARN of the egress notification SNS topic (null when disabled)."
-  value       = module.file_router.egress_sns_topic_arn
-}
-
-################################################################################
-# Audit Trail
-################################################################################
-
-output "audit_trail_table_arn" {
-  description = "ARN of the audit trail DynamoDB table (null when disabled)."
-  value       = module.file_router.audit_trail_table_arn
-}
-
-output "audit_trail_table_name" {
-  description = "Name of the audit trail DynamoDB table (null when disabled)."
-  value       = module.file_router.audit_trail_table_name
-}
-
-################################################################################
-# Prompt Injection Scanner
-################################################################################
-
-output "virustotal_scanner_function_arn" {
-  description = "ARN of the VirusTotal scanner Lambda function (null when scanning is disabled)."
-  value       = var.enable_virustotal_scanning ? aws_lambda_function.virustotal_scanner[0].arn : null
-}
-
-output "prompt_injection_scanner_function_arn" {
-  description = "ARN of the prompt injection scanner Lambda function (null when scanning is disabled)."
-  value       = var.enable_prompt_injection_scanning ? aws_lambda_function.prompt_injection_scanner[0].arn : null
-}
-
-output "prompt_injection_scanner_ecr_repository_url" {
-  description = "URL of the ECR repository for the prompt injection scanner image (null when scanning is disabled or a BYO image is provided)."
-  value       = local.build_scanner_image ? aws_ecr_repository.prompt_injection_scanner[0].repository_url : null
 }

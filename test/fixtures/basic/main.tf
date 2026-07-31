@@ -24,8 +24,7 @@ variable "test_id" {
 module "secure_upload" {
   source = "../../../"
 
-  name_prefix         = "terratest-basic-${var.test_id}"
-  enable_sftp_ingress = false
+  name_prefix = "terratest-basic-${var.test_id}"
 
   tags = {
     Environment = "test"
@@ -46,12 +45,12 @@ output "ingress_bucket_arn" {
   value = module.secure_upload.ingress_bucket_arn
 }
 
-output "egress_bucket_id" {
-  value = module.secure_upload.egress_bucket_id
+output "clean_bucket_id" {
+  value = module.secure_upload.clean_bucket_id
 }
 
-output "egress_bucket_arn" {
-  value = module.secure_upload.egress_bucket_arn
+output "clean_bucket_arn" {
+  value = module.secure_upload.clean_bucket_arn
 }
 
 output "quarantine_bucket_id" {

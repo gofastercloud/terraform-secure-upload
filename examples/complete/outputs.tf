@@ -3,9 +3,9 @@ output "ingress_bucket_id" {
   value       = module.secure_upload.ingress_bucket_id
 }
 
-output "egress_bucket_id" {
-  description = "Name of the egress bucket."
-  value       = module.secure_upload.egress_bucket_id
+output "clean_bucket_id" {
+  description = "Name of the clean bucket."
+  value       = module.secure_upload.clean_bucket_id
 }
 
 output "quarantine_bucket_id" {
@@ -18,28 +18,23 @@ output "kms_key_arn" {
   value       = module.secure_upload.kms_key_arn
 }
 
-output "sftp_ingress_server_id" {
-  description = "Ingress Transfer Family server ID."
-  value       = module.secure_upload.sftp_ingress_server_id
+output "sftp_server_id" {
+  description = "Transfer Family server ID."
+  value       = module.secure_upload.sftp_server_id
 }
 
-output "sftp_ingress_server_endpoint" {
-  description = "Ingress SFTP server endpoint hostname."
-  value       = module.secure_upload.sftp_ingress_server_endpoint
+output "sftp_server_endpoint" {
+  description = "Transfer Family SFTP endpoint hostname."
+  value       = module.secure_upload.sftp_server_endpoint
 }
 
-output "sftp_egress_server_id" {
-  description = "Egress Transfer Family server ID."
-  value       = module.secure_upload.sftp_egress_server_id
-}
-
-output "sftp_egress_server_endpoint" {
-  description = "Egress SFTP server endpoint hostname."
-  value       = module.secure_upload.sftp_egress_server_endpoint
+output "sftp_hostname" {
+  description = "Configured custom SFTP hostname, or the AWS endpoint when none is configured."
+  value       = module.secure_upload.sftp_hostname
 }
 
 output "sns_topic_arn" {
-  description = "ARN of the malware alert SNS topic."
+  description = "ARN of the per-instance scan notification SNS topic."
   value       = module.secure_upload.sns_topic_arn
 }
 

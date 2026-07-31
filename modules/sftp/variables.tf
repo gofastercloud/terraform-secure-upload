@@ -1,100 +1,68 @@
 variable "name_prefix" {
-  description = "Prefix for resource names"
+  description = "Prefix for SFTP resources."
   type        = string
 }
 
 variable "tags" {
-  description = "Tags to apply to all resources"
+  description = "Tags applied to SFTP resources."
   type        = map(string)
   default     = {}
 }
 
-variable "create_sftp_server" {
-  description = "Whether to create a new Transfer Family server or use an existing one"
-  type        = bool
-  default     = true
-}
-
-variable "existing_server_id" {
-  description = "ID of an existing Transfer Family server (used when create_sftp_server is false)"
-  type        = string
-  default     = null
-}
-
-variable "endpoint_type" {
-  description = "The type of endpoint for the Transfer Family server"
-  type        = string
-  default     = "PUBLIC"
-
-  validation {
-    condition     = contains(["PUBLIC", "VPC"], var.endpoint_type)
-    error_message = "endpoint_type must be \"PUBLIC\" or \"VPC\"."
-  }
-}
-
 variable "vpc_id" {
-  description = "VPC ID for VPC endpoint type"
+  description = "VPC hosting the internet-facing Transfer Family endpoint."
   type        = string
-  default     = null
 }
 
 variable "subnet_ids" {
-  description = "Subnet IDs for VPC endpoint type"
+  description = "Public subnets hosting the endpoint."
   type        = list(string)
-  default     = []
+}
+
+variable "address_allocation_ids" {
+  description = "Elastic IP allocation IDs, one per subnet."
+  type        = list(string)
 }
 
 variable "allowed_cidrs" {
-  description = "CIDR blocks allowed to access the SFTP server (VPC security group)"
+  description = "Client source CIDRs allowed to access TCP/22."
   type        = list(string)
-  default     = []
+}
+
+variable "custom_hostname" {
+  description = "Optional custom hostname displayed for the Transfer Family server."
+  type        = string
+  default     = null
 
   validation {
-    condition     = length(var.allowed_cidrs) > 0 || !var.create_sftp_server || var.endpoint_type != "VPC"
-    error_message = "allowed_cidrs must not be empty when creating a VPC-type SFTP server."
-  }
-
-  validation {
-    condition     = !contains(var.allowed_cidrs, "0.0.0.0/0")
-    error_message = "allowed_cidrs must not contain 0.0.0.0/0 — this would allow unrestricted access."
+    condition     = var.custom_hostname == null || (can(regex("^[A-Za-z0-9.-]+$", var.custom_hostname)) && !can(regex("\\.\\.", var.custom_hostname)))
+    error_message = "custom_hostname must be a valid DNS hostname without consecutive dots."
   }
 }
 
-variable "egress_cidrs" {
-  description = "CIDR blocks for security group egress (HTTPS to AWS APIs). Defaults to 0.0.0.0/0; restrict to VPC CIDR or AWS service ranges for tighter security."
-  type        = list(string)
-  default     = ["0.0.0.0/0"]
+variable "route53_hosted_zone_id" {
+  description = "Optional public Route 53 hosted zone ID used to create the custom hostname CNAME record."
+  type        = string
+  default     = null
 }
 
 variable "bucket_name" {
-  description = "Name of the S3 bucket (ingress for uploads, egress for verified downloads)"
+  description = "S3 bucket used as the logical SFTP storage target."
   type        = string
 }
 
 variable "bucket_arn" {
-  description = "ARN of the S3 bucket (ingress for uploads, egress for verified downloads)"
+  description = "S3 bucket ARN used in user IAM policies."
   type        = string
-}
-
-variable "read_only" {
-  description = "When true, SFTP users get read-only access (GetObject/ListBucket only, no PutObject). Used for egress."
-  type        = bool
-  default     = false
-}
-
-variable "security_policy_name" {
-  description = "Transfer Family security policy. See AWS docs for available policies."
-  type        = string
-  default     = "TransferSecurityPolicy-2024-01"
 }
 
 variable "kms_key_arn" {
-  description = "ARN of the KMS key used for S3 encryption"
+  description = "KMS key ARN used for S3 encryption."
   type        = string
 }
 
 variable "sftp_users" {
-  description = "SFTP users to create. home_directory_prefix must start and end with / and is used for home directory mapping and IAM policy scoping."
+  description = "Service-managed SFTP users and their isolated logical home prefixes."
   type = list(object({
     username              = string
     ssh_public_key        = string

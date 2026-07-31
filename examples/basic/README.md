@@ -1,6 +1,6 @@
 # Basic Example
 
-Minimal deployment of `terraform-secure-upload` using direct S3 uploads only (no SFTP). The module creates a KMS key, four S3 buckets (ingress, egress, quarantine, logs), GuardDuty Malware Protection, and the file-router Lambda.
+Minimal deployment using direct S3 uploads only. The module creates encrypted ingress, clean, quarantine, and access-log buckets, GuardDuty Malware Protection for S3, a scan router, a dead-letter queue, and one SNS topic for all scan results.
 
 ## Usage
 

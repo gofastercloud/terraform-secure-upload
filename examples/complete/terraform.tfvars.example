@@ -1,38 +1,24 @@
-name_prefix = "myapp-prod"
+name_prefix = "myapp"
 region      = "us-east-1"
 
-# kms_key_arn = "arn:aws:kms:us-east-1:123456789012:key/abcd-1234-efgh-5678"
+# Optional: use an existing customer-managed KMS key.
+kms_key_arn = null
 
-ingress_lifecycle_days    = 1
-egress_lifecycle_days      = 90
-quarantine_lifecycle_days = 365
-enable_object_lock        = true
-
-lambda_memory_size          = 512
-lambda_timeout              = 120
-lambda_reserved_concurrency = 20
-
-sns_subscription_emails = ["security@example.com", "ops@example.com"]
-
-log_retention_days = 180
-
-vpc_id     = "vpc-0abc123def456"
-subnet_ids = ["subnet-aaa111", "subnet-bbb222"]
-
-sftp_ingress_users = [
+vpc_id                  = "vpc-0123456789abcdef0"
+subnet_ids              = ["subnet-aaa", "subnet-bbb"]
+address_allocation_ids  = ["eipalloc-aaa", "eipalloc-bbb"]
+sftp_allowed_cidrs      = ["203.0.113.10/32"]
+sftp_custom_hostname    = "sftp.example.com"
+# Optional: creates the CNAME in this public Route 53 hosted zone.
+sftp_route53_hosted_zone_id = null
+sftp_users = [
   {
     username              = "partner-a"
     ssh_public_key        = "ssh-ed25519 AAAA... partner-a@example.com"
     home_directory_prefix = "/uploads/partner-a/"
-  },
-  {
-    username              = "partner-b"
-    ssh_public_key        = "ssh-ed25519 AAAA... partner-b@example.com"
-    home_directory_prefix = "/uploads/partner-b/"
-  },
+  }
 ]
 
 tags = {
-  Environment = "production"
-  Team        = "security"
+  Environment = "dev"
 }
