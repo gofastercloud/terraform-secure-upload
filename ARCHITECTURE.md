@@ -21,7 +21,7 @@ S3 API or optional Transfer Family SFTP
 
 ## Components
 
-- `modules/s3-buckets` creates four encrypted, private buckets: ingress, clean, quarantine, and access logs. Ingress versioning and bounded current/noncurrent lifecycle are managed by the module; clean and quarantine retention and archival remain consumer-configured.
+- `modules/s3-buckets` creates three encrypted, private data buckets: ingress, clean, and quarantine. S3 server access logs are delivered as structured records to a KMS-encrypted CloudWatch Logs group. Ingress versioning and bounded current/noncurrent lifecycle are managed by the module; clean and quarantine retention and archival remain consumer-configured.
 - `modules/guardduty-protection` creates a standalone GuardDuty Malware Protection for S3 plan with post-scan object tagging enabled.
 - `modules/file-router` consumes GuardDuty scan-result events, routes the scanned S3 object version, publishes one notification per result, and uses an SQS dead-letter queue for failed processing.
 - `modules/sftp` is created only when `enable_sftp = true`. It creates a VPC-hosted, internet-facing SFTP server, a source-CIDR security group, a logging role, and one least-privilege IAM role per service-managed user.

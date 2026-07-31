@@ -45,7 +45,6 @@ func TestBasicDeployment(t *testing.T) {
 	ingressBucketID := terraform.Output(t, terraformOptions, "ingress_bucket_id")
 	cleanBucketID := terraform.Output(t, terraformOptions, "clean_bucket_id")
 	quarantineBucketID := terraform.Output(t, terraformOptions, "quarantine_bucket_id")
-	logBucketID := terraform.Output(t, terraformOptions, "log_bucket_id")
 	kmsKeyArn := terraform.Output(t, terraformOptions, "kms_key_arn")
 	snsTopicArn := terraform.Output(t, terraformOptions, "sns_topic_arn")
 	lambdaFunctionArn := terraform.Output(t, terraformOptions, "lambda_function_arn")
@@ -53,7 +52,6 @@ func TestBasicDeployment(t *testing.T) {
 	assert.NotEmpty(t, ingressBucketID, "Ingress bucket ID should not be empty")
 	assert.NotEmpty(t, cleanBucketID, "Clean bucket ID should not be empty")
 	assert.NotEmpty(t, quarantineBucketID, "Quarantine bucket ID should not be empty")
-	assert.NotEmpty(t, logBucketID, "Log bucket ID should not be empty")
 	assert.NotEmpty(t, kmsKeyArn, "KMS key ARN should not be empty")
 	assert.NotEmpty(t, snsTopicArn, "SNS topic ARN should not be empty")
 	assert.NotEmpty(t, lambdaFunctionArn, "Lambda function ARN should not be empty")
@@ -63,10 +61,9 @@ func TestBasicDeployment(t *testing.T) {
 	assert.Equal(t, expectedPrefix+"-ingress", ingressBucketID)
 	assert.Equal(t, expectedPrefix+"-clean", cleanBucketID)
 	assert.Equal(t, expectedPrefix+"-quarantine", quarantineBucketID)
-	assert.Equal(t, expectedPrefix+"-logs", logBucketID)
 
 	// ── Verify S3 bucket encryption ─────────────────────────────────────
-	for _, bucketID := range []string{ingressBucketID, cleanBucketID, quarantineBucketID, logBucketID} {
+	for _, bucketID := range []string{ingressBucketID, cleanBucketID, quarantineBucketID} {
 		encryption := getS3BucketEncryption(t, awsRegion, bucketID)
 		require.NotNil(t, encryption, "Bucket %s should have encryption configured", bucketID)
 		require.NotEmpty(t, encryption.ServerSideEncryptionConfiguration.Rules, "Bucket %s should have encryption rules", bucketID)
@@ -78,7 +75,7 @@ func TestBasicDeployment(t *testing.T) {
 	}
 
 	// ── Verify S3 public access block ───────────────────────────────────
-	for _, bucketID := range []string{ingressBucketID, cleanBucketID, quarantineBucketID, logBucketID} {
+	for _, bucketID := range []string{ingressBucketID, cleanBucketID, quarantineBucketID} {
 		publicAccessBlock := getS3BucketPublicAccessBlock(t, awsRegion, bucketID)
 		assert.True(t, sdkaws.BoolValue(publicAccessBlock.BlockPublicAcls), "Bucket %s should block public ACLs", bucketID)
 		assert.True(t, sdkaws.BoolValue(publicAccessBlock.BlockPublicPolicy), "Bucket %s should block public policy", bucketID)
@@ -165,10 +162,9 @@ func TestBucketPolicies(t *testing.T) {
 	ingressBucketID := terraform.Output(t, terraformOptions, "ingress_bucket_id")
 	cleanBucketID := terraform.Output(t, terraformOptions, "clean_bucket_id")
 	quarantineBucketID := terraform.Output(t, terraformOptions, "quarantine_bucket_id")
-	logBucketID := terraform.Output(t, terraformOptions, "log_bucket_id")
 
 	// ── Verify SSL-only bucket policies ─────────────────────────────────
-	for _, bucketID := range []string{ingressBucketID, cleanBucketID, quarantineBucketID, logBucketID} {
+	for _, bucketID := range []string{ingressBucketID, cleanBucketID, quarantineBucketID} {
 		policy := getS3BucketPolicy(t, awsRegion, bucketID)
 		require.NotEmpty(t, policy, "Bucket %s should have a policy", bucketID)
 
@@ -182,7 +178,7 @@ func TestBucketPolicies(t *testing.T) {
 	}
 
 	// ── Verify public access is blocked at bucket level ─────────────────
-	for _, bucketID := range []string{ingressBucketID, cleanBucketID, quarantineBucketID, logBucketID} {
+	for _, bucketID := range []string{ingressBucketID, cleanBucketID, quarantineBucketID} {
 		publicAccessBlock := getS3BucketPublicAccessBlock(t, awsRegion, bucketID)
 		assert.True(t, sdkaws.BoolValue(publicAccessBlock.BlockPublicAcls),
 			"Bucket %s must block public ACLs", bucketID)

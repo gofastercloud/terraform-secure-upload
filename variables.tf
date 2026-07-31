@@ -32,13 +32,13 @@ variable "kms_key_deletion_window_days" {
 }
 
 variable "kms_key_arn" {
-  description = "Existing KMS key ARN. Required when create_kms_key is false."
+  description = "Full existing symmetric customer-managed KMS key ARN. Required when create_kms_key is false."
   type        = string
   default     = null
 
   validation {
-    condition     = var.kms_key_arn == null || can(regex("^arn:[^:]+:kms:", var.kms_key_arn))
-    error_message = "kms_key_arn must be a valid KMS key ARN."
+    condition     = var.kms_key_arn == null || can(regex("^arn:[^:]+:kms:[^:]+:[0-9]{12}:key/[A-Za-z0-9-]+$", var.kms_key_arn))
+    error_message = "kms_key_arn must be a full symmetric customer-managed KMS key ARN, not an alias ARN."
   }
 
   validation {

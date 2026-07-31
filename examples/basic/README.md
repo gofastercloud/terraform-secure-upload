@@ -1,6 +1,6 @@
 # Basic Example
 
-Minimal deployment using direct S3 uploads only. The module creates encrypted ingress, clean, quarantine, and access-log buckets, GuardDuty Malware Protection for S3, a scan router, a dead-letter queue, and one SNS topic for all scan results.
+Minimal deployment using direct S3 uploads only. The module creates encrypted ingress, clean, and quarantine buckets, a KMS-encrypted CloudWatch Logs group for S3 access logs, GuardDuty Malware Protection for S3, a scan router, a dead-letter queue, and one SNS topic for all scan results.
 
 ## Usage
 

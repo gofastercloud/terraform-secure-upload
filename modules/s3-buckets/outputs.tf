@@ -28,12 +28,12 @@ output "quarantine_bucket_arn" {
   value       = aws_s3_bucket.quarantine.arn
 }
 
-output "logs_bucket_id" {
-  description = "ID of the S3 access-log bucket"
-  value       = aws_s3_bucket.logs.id
+output "s3_access_log_group_name" {
+  description = "CloudWatch Logs group receiving S3 server access logs."
+  value       = aws_cloudwatch_log_group.s3_access.name
 }
 
-output "logs_bucket_arn" {
-  description = "ARN of the S3 access-log bucket"
-  value       = aws_s3_bucket.logs.arn
+output "s3_access_log_group_arn" {
+  description = "ARN of the CloudWatch Logs group receiving S3 server access logs."
+  value       = aws_cloudwatch_log_group.s3_access.arn
 }

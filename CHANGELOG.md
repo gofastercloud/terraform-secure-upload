@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Changed
+
+- Existing KMS keys now require full customer-managed key ARNs, including keys provisioned in a central security account. Cross-account use remains dependent on both the owning-account KMS key policy and workload-account IAM policies.
+- Replaced S3 server access-log buckets with native CloudWatch Logs delivery and a KMS-encrypted access-log group.
+
 ## [0.7.2] - 2026-02-10
 
 ### Fixed

@@ -26,6 +26,8 @@ resource "aws_kms_key" "this" {
             "lambda.amazonaws.com",
             "s3.amazonaws.com",
             "sns.amazonaws.com",
+            "sqs.amazonaws.com",
+            "events.amazonaws.com",
             "transfer.amazonaws.com",
           ]
         }
@@ -79,9 +81,10 @@ resource "aws_kms_alias" "this" {
 module "s3_buckets" {
   source = "./modules/s3-buckets"
 
-  name_prefix = var.name_prefix
-  tags        = local.default_tags
-  kms_key_arn = local.kms_key_arn
+  name_prefix        = var.name_prefix
+  tags               = local.default_tags
+  kms_key_arn        = local.kms_key_arn
+  log_retention_days = var.log_retention_days
 
   ingress_object_expiration_days             = var.ingress_object_expiration_days
   ingress_noncurrent_version_expiration_days = var.ingress_noncurrent_version_expiration_days

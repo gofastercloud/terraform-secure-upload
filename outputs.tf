@@ -28,14 +28,14 @@ output "quarantine_bucket_arn" {
   value       = module.s3_buckets.quarantine_bucket_arn
 }
 
-output "log_bucket_id" {
-  description = "Name of the S3 access-log bucket."
-  value       = module.s3_buckets.logs_bucket_id
+output "s3_access_log_group_name" {
+  description = "Name of the CloudWatch Logs group receiving S3 server access logs."
+  value       = module.s3_buckets.s3_access_log_group_name
 }
 
-output "log_bucket_arn" {
-  description = "ARN of the S3 access-log bucket."
-  value       = module.s3_buckets.logs_bucket_arn
+output "s3_access_log_group_arn" {
+  description = "ARN of the CloudWatch Logs group receiving S3 server access logs."
+  value       = module.s3_buckets.s3_access_log_group_arn
 }
 
 output "kms_key_arn" {

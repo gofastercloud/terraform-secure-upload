@@ -56,12 +56,12 @@ output "quarantine_bucket_arn" {
   value = module.secure_upload.quarantine_bucket_arn
 }
 
-output "log_bucket_id" {
-  value = module.secure_upload.log_bucket_id
+output "s3_access_log_group_name" {
+  value = module.secure_upload.s3_access_log_group_name
 }
 
-output "log_bucket_arn" {
-  value = module.secure_upload.log_bucket_arn
+output "s3_access_log_group_arn" {
+  value = module.secure_upload.s3_access_log_group_arn
 }
 
 output "kms_key_arn" {

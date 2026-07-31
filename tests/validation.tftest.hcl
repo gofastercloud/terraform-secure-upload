@@ -41,6 +41,33 @@ run "kms_key_required_when_not_created" {
   expect_failures = [var.kms_key_arn]
 }
 
+run "kms_key_rejects_alias_arn" {
+  command = plan
+
+  variables {
+    name_prefix    = "test-val"
+    create_kms_key = false
+    kms_key_arn    = "arn:aws:kms:us-east-1:123456789012:alias/secure-upload"
+  }
+
+  expect_failures = [var.kms_key_arn]
+}
+
+run "kms_key_accepts_cross_account_key_arn" {
+  command = plan
+
+  variables {
+    name_prefix    = "test-val"
+    create_kms_key = false
+    kms_key_arn    = "arn:aws:kms:us-east-1:210987654321:key/12345678-1234-1234-1234-123456789012"
+  }
+
+  assert {
+    condition     = output.kms_key_arn == "arn:aws:kms:us-east-1:210987654321:key/12345678-1234-1234-1234-123456789012"
+    error_message = "A full KMS key ARN from another account must be passed through unchanged"
+  }
+}
+
 run "sftp_requires_vpc_configuration" {
   command = plan
 

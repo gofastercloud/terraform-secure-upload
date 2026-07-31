@@ -48,8 +48,8 @@ output "quarantine_bucket_id" {
   value = module.secure_upload.quarantine_bucket_id
 }
 
-output "log_bucket_id" {
-  value = module.secure_upload.log_bucket_id
+output "s3_access_log_group_name" {
+  value = module.secure_upload.s3_access_log_group_name
 }
 
 output "sns_topic_arn" {

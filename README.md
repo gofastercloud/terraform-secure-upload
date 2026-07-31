@@ -16,6 +16,8 @@ The ingress bucket deliberately disables S3 Bucket Keys so KMS receives the indi
 
 Ingress versioning binds each malware-scan verdict to the exact object version that GuardDuty inspected. The scan router rejects events without a usable version ID and never falls back to the current key. Ingress current objects and noncurrent versions expire using `ingress_object_expiration_days` and `ingress_noncurrent_version_expiration_days`; the defaults are 7 days for each.
 
+S3 server access logs for the ingress, clean, and quarantine buckets are delivered as structured logs to the KMS-encrypted CloudWatch Logs group exported as `s3_access_log_group_name`. The module does not create an S3 access-log bucket.
+
 ## Usage
 
 ```hcl
@@ -54,12 +56,12 @@ All taggable resources receive the supplied `tags` plus `Module=terraform-secure
 - Subscribe downstream consumers to the exported `sns_topic_arn`.
 - If using a custom hostname with an external DNS provider, create a CNAME from that hostname to the Transfer Family VPC endpoint DNS name. Supplying `sftp_route53_hosted_zone_id` makes the module create the Route 53 record instead.
 - Configure clean and quarantine retention and archival policies in the consuming stack. Ingress current objects and noncurrent versions expire using `ingress_object_expiration_days` and `ingress_noncurrent_version_expiration_days`.
-- If supplying `kms_key_arn`, its key policy must permit the AWS services and roles created by the module to use the key.
+- If supplying `kms_key_arn`, use a full symmetric customer-managed KMS key ARN. For a key in a central security account, its key policy must grant the workload account or module-created roles and required AWS services, and the workload IAM policies must also grant the required KMS actions. The key must be in the same Region as the workload resources.
 - Do not grant SFTP user roles broad standalone KMS permissions. Their KMS permissions are intentionally constrained to S3 requests whose encryption context matches their home prefix.
 
 ## Outputs
 
-The main outputs are `ingress_bucket_id`, `clean_bucket_id`, `quarantine_bucket_id`, `log_bucket_id`, `sns_topic_arn`, `guardduty_protection_plan_arn`, `eventbridge_rule_arn`, `dlq_arn`, and `kms_key_arn`. When SFTP is enabled, `sftp_server_id`, `sftp_server_endpoint`, `sftp_hostname`, and `sftp_user_arns` are populated.
+The main outputs are `ingress_bucket_id`, `clean_bucket_id`, `quarantine_bucket_id`, `s3_access_log_group_name`, `s3_access_log_group_arn`, `sns_topic_arn`, `guardduty_protection_plan_arn`, `eventbridge_rule_arn`, `dlq_arn`, and `kms_key_arn`. When SFTP is enabled, `sftp_server_id`, `sftp_server_endpoint`, `sftp_hostname`, and `sftp_user_arns` are populated.
 
 ## Verification
 
@@ -102,3 +104,4 @@ export TEST_SFTP_ALLOWED_CIDRS=203.0.113.10/32
 - [S3 performance optimization](https://docs.aws.amazon.com/AmazonS3/latest/userguide/optimizing-performance.html)
 - [S3 SSE-KMS encryption context](https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingKMSEncryption.html)
 - [AWS KMS encryption-context conditions](https://docs.aws.amazon.com/kms/latest/developerguide/conditions-kms.html)
+- [CloudWatch Logs delivery for S3 server access logs](https://docs.aws.amazon.com/AmazonS3/latest/userguide/ServerLogs.html)

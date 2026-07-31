@@ -209,7 +209,6 @@ type integrationResources struct {
 	IngressBucket    string
 	CleanBucket      string
 	QuarantineBucket string
-	LogBucket        string
 	SNSTopicARN      string
 	LambdaARN        string
 	ServerID         string
@@ -230,9 +229,6 @@ func readIntegrationResources(t *testing.T, options *terraform.Options) (integra
 		return result, err
 	}
 	if result.QuarantineBucket, err = output("quarantine_bucket_id"); err != nil {
-		return result, err
-	}
-	if result.LogBucket, err = output("log_bucket_id"); err != nil {
 		return result, err
 	}
 	if result.SNSTopicARN, err = output("sns_topic_arn"); err != nil {
@@ -759,7 +755,6 @@ func cleanupIntegration(t *testing.T, report *integrationReport, options *terraf
 		"cleanup-ingress":    resources.IngressBucket,
 		"cleanup-clean":      resources.CleanBucket,
 		"cleanup-quarantine": resources.QuarantineBucket,
-		"cleanup-logs":       resources.LogBucket,
 	} {
 		if bucket == "" {
 			continue

@@ -1,92 +1,17 @@
-################################################################################
-# Logs Bucket (created first - other buckets log to this one)
-################################################################################
-
 locals {
-  account_hash  = substr(sha256(data.aws_caller_identity.current.account_id), 0, 8)
-  log_bucket_id = aws_s3_bucket.logs.id
-}
-
-resource "aws_s3_bucket" "logs" {
-  bucket = "${var.name_prefix}-${local.account_hash}-logs"
-  tags   = var.tags
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "logs" {
-  bucket = aws_s3_bucket.logs.id
-
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm     = "aws:kms"
-      kms_master_key_id = var.kms_key_arn
-    }
-    bucket_key_enabled = true
+  account_hash = substr(sha256(data.aws_caller_identity.current.account_id), 0, 8)
+  access_log_bucket_arns = {
+    ingress    = aws_s3_bucket.ingress.arn
+    egress     = aws_s3_bucket.egress.arn
+    quarantine = aws_s3_bucket.quarantine.arn
   }
 }
 
-resource "aws_s3_bucket_public_access_block" "logs" {
-  bucket = aws_s3_bucket.logs.id
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
-resource "aws_s3_bucket_ownership_controls" "logs" {
-  bucket = aws_s3_bucket.logs.id
-
-  rule {
-    object_ownership = "BucketOwnerEnforced"
-  }
-}
-
-data "aws_iam_policy_document" "logs" {
-  statement {
-    sid     = "DenyInsecureTransport"
-    effect  = "Deny"
-    actions = ["s3:*"]
-    resources = [
-      aws_s3_bucket.logs.arn,
-      "${aws_s3_bucket.logs.arn}/*",
-    ]
-
-    principals {
-      type        = "*"
-      identifiers = ["*"]
-    }
-
-    condition {
-      test     = "Bool"
-      variable = "aws:SecureTransport"
-      values   = ["false"]
-    }
-  }
-
-  statement {
-    sid     = "AllowS3LogDelivery"
-    effect  = "Allow"
-    actions = ["s3:PutObject"]
-    resources = [
-      "${aws_s3_bucket.logs.arn}/*",
-    ]
-
-    principals {
-      type        = "Service"
-      identifiers = ["logging.s3.amazonaws.com"]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:SourceAccount"
-      values   = [data.aws_caller_identity.current.account_id]
-    }
-  }
-}
-
-resource "aws_s3_bucket_policy" "logs" {
-  bucket = aws_s3_bucket.logs.id
-  policy = data.aws_iam_policy_document.logs.json
+resource "aws_cloudwatch_log_group" "s3_access" {
+  name              = "/aws/s3/${var.name_prefix}-access"
+  retention_in_days = var.log_retention_days
+  kms_key_id        = var.kms_key_arn
+  tags              = var.tags
 }
 
 ################################################################################
@@ -159,12 +84,6 @@ resource "aws_s3_bucket_ownership_controls" "ingress" {
   rule {
     object_ownership = "BucketOwnerEnforced"
   }
-}
-
-resource "aws_s3_bucket_logging" "ingress" {
-  bucket        = aws_s3_bucket.ingress.id
-  target_bucket = local.log_bucket_id
-  target_prefix = "ingress/"
 }
 
 data "aws_iam_policy_document" "ssl_only_ingress" {
@@ -294,12 +213,6 @@ resource "aws_s3_bucket_ownership_controls" "egress" {
   }
 }
 
-resource "aws_s3_bucket_logging" "egress" {
-  bucket        = aws_s3_bucket.egress.id
-  target_bucket = local.log_bucket_id
-  target_prefix = "clean/"
-}
-
 data "aws_iam_policy_document" "ssl_only_egress" {
   statement {
     sid     = "DenyInsecureTransport"
@@ -418,12 +331,6 @@ resource "aws_s3_bucket_ownership_controls" "quarantine" {
   }
 }
 
-resource "aws_s3_bucket_logging" "quarantine" {
-  bucket        = aws_s3_bucket.quarantine.id
-  target_bucket = local.log_bucket_id
-  target_prefix = "quarantine/"
-}
-
 data "aws_iam_policy_document" "ssl_only_quarantine" {
   statement {
     sid     = "DenyInsecureTransport"
@@ -502,6 +409,37 @@ data "aws_iam_policy_document" "ssl_only_quarantine" {
 resource "aws_s3_bucket_policy" "quarantine" {
   bucket = aws_s3_bucket.quarantine.id
   policy = data.aws_iam_policy_document.ssl_only_quarantine.json
+}
+
+################################################################################
+# CloudWatch S3 access-log delivery
+################################################################################
+
+resource "aws_cloudwatch_log_delivery_source" "s3_access" {
+  for_each = local.access_log_bucket_arns
+
+  name         = "${var.name_prefix}-${each.key}-s3-access"
+  log_type     = "S3_SERVER_ACCESS_LOGS"
+  resource_arn = each.value
+  tags         = var.tags
+}
+
+resource "aws_cloudwatch_log_delivery_destination" "s3_access" {
+  name          = "${var.name_prefix}-s3-access"
+  output_format = "json"
+
+  delivery_destination_configuration {
+    destination_resource_arn = aws_cloudwatch_log_group.s3_access.arn
+  }
+
+  tags = var.tags
+}
+
+resource "aws_cloudwatch_log_delivery" "s3_access" {
+  for_each = local.access_log_bucket_arns
+
+  delivery_source_name     = aws_cloudwatch_log_delivery_source.s3_access[each.key].name
+  delivery_destination_arn = aws_cloudwatch_log_delivery_destination.s3_access.arn
 }
 
 ################################################################################

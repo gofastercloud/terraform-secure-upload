@@ -46,13 +46,33 @@ run "bucket_security" {
   }
 
   assert {
-    condition     = aws_s3_bucket_public_access_block.ingress.block_public_policy && aws_s3_bucket_public_access_block.egress.block_public_policy && aws_s3_bucket_public_access_block.quarantine.block_public_policy && aws_s3_bucket_public_access_block.logs.block_public_policy
-    error_message = "All buckets must block public bucket policies"
+    condition     = aws_s3_bucket_public_access_block.ingress.block_public_policy && aws_s3_bucket_public_access_block.egress.block_public_policy && aws_s3_bucket_public_access_block.quarantine.block_public_policy
+    error_message = "All data buckets must block public bucket policies"
   }
 
   assert {
-    condition     = one(aws_s3_bucket_ownership_controls.ingress.rule).object_ownership == "BucketOwnerEnforced" && one(aws_s3_bucket_ownership_controls.egress.rule).object_ownership == "BucketOwnerEnforced" && one(aws_s3_bucket_ownership_controls.quarantine.rule).object_ownership == "BucketOwnerEnforced" && one(aws_s3_bucket_ownership_controls.logs.rule).object_ownership == "BucketOwnerEnforced"
-    error_message = "All buckets must enforce bucket ownership"
+    condition     = one(aws_s3_bucket_ownership_controls.ingress.rule).object_ownership == "BucketOwnerEnforced" && one(aws_s3_bucket_ownership_controls.egress.rule).object_ownership == "BucketOwnerEnforced" && one(aws_s3_bucket_ownership_controls.quarantine.rule).object_ownership == "BucketOwnerEnforced"
+    error_message = "All data buckets must enforce bucket ownership"
+  }
+
+  assert {
+    condition     = aws_cloudwatch_log_group.s3_access.name == "/aws/s3/test-s3sec-access"
+    error_message = "S3 access logs must use the module CloudWatch log group"
+  }
+
+  assert {
+    condition     = aws_cloudwatch_log_delivery_source.s3_access["ingress"].log_type == "S3_SERVER_ACCESS_LOGS" && aws_cloudwatch_log_delivery_source.s3_access["egress"].log_type == "S3_SERVER_ACCESS_LOGS" && aws_cloudwatch_log_delivery_source.s3_access["quarantine"].log_type == "S3_SERVER_ACCESS_LOGS"
+    error_message = "Each data bucket must have an S3 server access log delivery source"
+  }
+
+  assert {
+    condition     = aws_cloudwatch_log_delivery_destination.s3_access.name == "test-s3sec-s3-access" && aws_cloudwatch_log_delivery_destination.s3_access.output_format == "json"
+    error_message = "S3 access logs must use a JSON CloudWatch delivery destination"
+  }
+
+  assert {
+    condition     = length(aws_cloudwatch_log_delivery.s3_access) == 3
+    error_message = "Ingress, clean, and quarantine access logs must all be delivered to CloudWatch"
   }
 
 }
